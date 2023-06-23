@@ -13,6 +13,7 @@
 /// pipelines.
 ///
 //===----------------------------------------------------------------------===//
+#include "llvm/Transforms/Utils/PetarHelloWorld.h"
 
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
