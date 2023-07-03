@@ -266,6 +266,11 @@ FUNCTION_ALIAS_ANALYSIS("tbaa", TypeBasedAA())
 #ifndef FUNCTION_PASS
 #define FUNCTION_PASS(NAME, CREATE_PASS)
 #endif
+//---------------------------------------------
+// Petar's code!
+FUNCTION_PASS("petarhelloworld", PetarHelloWorldPass())
+FUNCTION_PASS("petarcountcttz", PetarCountCttzPass())
+//---------------------------------------------
 FUNCTION_PASS("aa-eval", AAEvaluator())
 FUNCTION_PASS("adce", ADCEPass())
 FUNCTION_PASS("add-discriminators", AddDiscriminatorsPass())
