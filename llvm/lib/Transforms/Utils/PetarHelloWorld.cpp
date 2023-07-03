@@ -1,7 +1,6 @@
 #include "llvm/Transforms/Utils/PetarHelloWorld.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
-//---------------------------------
 #include "llvm/Support/Regex.h"
 
 using namespace llvm;
@@ -19,8 +18,10 @@ PreservedAnalyses PetarHelloWorldPass::run(Function &F, FunctionAnalysisManager 
        if(CallBase::classof(&I)){
           CallBase* callBase = (CallBase*) &I;
           StringRef functionName = callBase->getCalledFunction()->getName();
-          if(llvmcttzRegex.match(functionName))
+          if(llvmcttzRegex.match(functionName)){
+            errs() << "Look what we have found -> " << functionName << "\n";
             count_cttz_intrinsic_appearance++;
+          }  
        }     
     }
   }
