@@ -1,0 +1,6 @@
+LLVM project
+Author: Chris Lattner
+Master thesis title: Semantic detection of a CRC function for RISCV in LLVM
+
+What have I learned so far?
+
