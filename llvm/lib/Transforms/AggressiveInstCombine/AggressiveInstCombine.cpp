@@ -267,6 +267,70 @@ static bool foldAnyOrAllBitsSet(Instruction &I) {
   ++NumAnyOrAllBitsSet;
   return true;
 }
+//---------------------------------------------------------------------------------------------------------------------------------------
+// Petar's code!
+//unsigned reverse(unsigned x) {
+//   x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555);
+//   x = ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333);
+//   x = ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F);
+//   x = (x << 24) | ((x & 0xFF00) << 8) |
+//       ((x >> 8) & 0xFF00) | (x >> 24);
+//   return x;
+//}
+
+static bool tryToRecognizeReverseFunction(Instruction &I){
+  if(I.getOpcode!=Instruction::Or)
+    return false;
+  Type *Ty = I.getType();
+  if (!Ty->isIntOrIntVectorTy())
+    return false;
+
+  APInt Mask55 = APInt::getSplat(Len, APInt(8, 0x55));
+  APInt Mask33 = APInt::getSplat(Len, APInt(8, 0x33));
+  APInt Mask0F = APInt::getSplat(Len, APInt(8, 0x0F));
+  APInt Mask01 = APInt::getSplat(Len, APInt(8, 0x01));
+  APInt MaskShift = APInt(Len, Len - 8); 
+
+  Value *Op0 = I.getOperand(0);
+  Value *Op1 = I.getOperand(1);
+  Value *MulOp0;
+  
+  // I need to change this part!
+  // Matching "(i * 0x01010101...) >> 24".
+ 
+  //   (x << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24));
+  if ((match(Op0, m_Shl(m_Value(MulOp0), m_SpecificInt(Mask01)))) &&
+      match(Op1, m_SpecificInt(MaskShift))) {
+    Value *ShiftOp0;
+    // Matching "((i + (i >> 4)) & 0x0F0F0F0F...)".
+    if (match(MulOp0, m_And(m_c_Add(m_LShr(m_Value(ShiftOp0), m_SpecificInt(4)),
+                                    m_Deferred(ShiftOp0)),
+                            m_SpecificInt(Mask0F)))) {
+      Value *AndOp0;
+      // Matching "(i & 0x33333333...) + ((i >> 2) & 0x33333333...)".
+      if (match(ShiftOp0,
+                m_c_Add(m_And(m_Value(AndOp0), m_SpecificInt(Mask33)),
+                        m_And(m_LShr(m_Deferred(AndOp0), m_SpecificInt(2)),
+                              m_SpecificInt(Mask33))))) {
+        Value *Root, *SubOp1;
+        // Matching "i - ((i >> 1) & 0x55555555...)".
+        if (match(AndOp0, m_Sub(m_Value(Root), m_Value(SubOp1))) &&
+            match(SubOp1, m_And(m_LShr(m_Specific(Root), m_SpecificInt(1)),
+                                m_SpecificInt(Mask55)))) {
+          LLVM_DEBUG(dbgs() << "Recognized popcount intrinsic\n");
+          IRBuilder<> Builder(&I);
+          Function *Func = Intrinsic::getDeclaration(
+              I.getModule(), Intrinsic::ctpop, I.getType());
+          I.replaceAllUsesWith(Builder.CreateCall(Func, {Root}));
+          ++NumPopCountRecognized;
+          return true;
+        }
+      }
+  }       
+}
+
+//---------------------------------------------------------------------------------------------------------------------------------------
+
 
 // Try to recognize below function as popcount intrinsic.
 // This is the "best" algorithm from
@@ -442,6 +506,108 @@ static bool foldSqrt(Instruction &I, TargetTransformInfo &TTI,
   return false;
 }
 
+//---------------------------------------------------------------------------------------------------------------------------------------
+// Petar's code!
+
+//LLVM IR code for the naive crc algorithm implementation!
+/*
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @crc32a(i8* %0, i32 %1) #0 {
+  %3 = alloca i8*, align 8
+  %4 = alloca i32, align 4
+  %5 = alloca i32, align 4
+  %6 = alloca i32, align 4
+  %7 = alloca i32, align 4
+  %8 = alloca i32, align 4
+  store i8* %0, i8** %3, align 8
+  store i32 %1, i32* %4, align 4
+  store i32 0, i32* %5, align 4
+  store i32 -1, i32* %8, align 4
+  br label %9
+
+9:                                                ; preds = %43, %2
+  %10 = load i32, i32* %5, align 4
+  %11 = load i32, i32* %4, align 4
+  %12 = icmp ult i32 %10, %11
+  br i1 %12, label %13, label %46
+
+13:                                               ; preds = %9
+  %14 = load i8*, i8** %3, align 8
+  %15 = load i32, i32* %5, align 4
+  %16 = sext i32 %15 to i64
+  %17 = getelementptr inbounds i8, i8* %14, i64 %16
+  %18 = load i8, i8* %17, align 1
+  %19 = zext i8 %18 to i32
+  store i32 %19, i32* %7, align 4
+  %20 = load i32, i32* %7, align 4
+  %21 = call i32 @reverse(i32 %20)
+  store i32 %21, i32* %7, align 4
+  store i32 0, i32* %6, align 4
+  br label %22
+
+22:                                               ; preds = %40, %13
+  %23 = load i32, i32* %6, align 4
+  %24 = icmp sle i32 %23, 7
+  br i1 %24, label %25, label %43
+
+25:                                               ; preds = %22
+  %26 = load i32, i32* %8, align 4
+  %27 = load i32, i32* %7, align 4
+  %28 = xor i32 %26, %27
+  %29 = icmp slt i32 %28, 0
+  br i1 %29, label %30, label %34
+
+30:                                               ; preds = %25
+  %31 = load i32, i32* %8, align 4
+  %32 = shl i32 %31, 1
+  %33 = xor i32 %32, 79764919
+  store i32 %33, i32* %8, align 4
+  br label %37
+
+34:                                               ; preds = %25
+  %35 = load i32, i32* %8, align 4
+  %36 = shl i32 %35, 1
+  store i32 %36, i32* %8, align 4
+  br label %37
+
+37:                                               ; preds = %34, %30
+  %38 = load i32, i32* %7, align 4
+  %39 = shl i32 %38, 1
+  store i32 %39, i32* %7, align 4
+  br label %40
+
+40:                                               ; preds = %37
+  %41 = load i32, i32* %6, align 4
+  %42 = add nsw i32 %41, 1
+  store i32 %42, i32* %6, align 4
+  br label %22
+
+43:                                               ; preds = %22
+  %44 = load i32, i32* %5, align 4
+  %45 = add nsw i32 %44, 1
+  store i32 %45, i32* %5, align 4
+  br label %9
+
+46:                                               ; preds = %9
+  %47 = load i32, i32* %8, align 4
+  %48 = xor i32 %47, -1
+  %49 = call i32 @reverse(i32 %48)
+  ret i32 %49
+}
+*/
+static bool tryToRecognizeCrc(Instruction &I){
+    LoadInst *LI = dyn_cast<LoadInst>(&I);
+    if(!LI)
+      return false;
+
+    Type *AccessType = LI->getType();
+    if(!AccessType->isIntegerTy())
+      return false;
+   //llvm::PatternMatch::m_Cmp   
+}
+
+//---------------------------------------------------------------------------------------------------------------------------------------
+
 // Check if this array of constants represents a cttz table.
 // Iterate over the elements from \p Table by trying to find/match all
 // the numbers from 0 to \p InputBits that should represent cttz results.
@@ -475,7 +641,7 @@ static bool isCTTZTable(const ConstantDataArray &Table, uint64_t Mul,
 // int f(unsigned x) {
 //    static const char table[32] =
 //      {0, 1, 28, 2, 29, 14, 24, 3, 30,
-//       22, 20, 15, 25, 17, 4, 8, 31, 27,
+//        22, 20, 15, 25, 17, 4, 8, 31, 27,
 //       13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9};
 //    return table[((unsigned)((x & -x) * 0x077CB531U)) >> 27];
 // }
