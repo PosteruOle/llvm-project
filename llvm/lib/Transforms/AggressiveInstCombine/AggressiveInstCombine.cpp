@@ -270,13 +270,18 @@ static bool foldAnyOrAllBitsSet(Instruction &I) {
 //---------------------------------------------------------------------------------------------------------------------------------------
 // Petar's code!
 //unsigned reverse(unsigned x) {
-//   x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555);
-//   x = ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333);
-//   x = ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F);
-//   x = (x << 24) | ((x & 0xFF00) << 8) |
-//       ((x >> 8) & 0xFF00) | (x >> 24);
+//   x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555);               ?
+//   x = ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333);               .
+//   x = ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F);               .
+//   x = (x << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24); .  
 //   return x;
 //}
+
+// int popcount(unsigned int i) {
+//   i = i - ((i >> 1) & 0x55555555);
+//   i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+//   i = ((i + (i >> 4)) & 0x0F0F0F0F);
+//   return (i * 0x01010101) >> 24;
 
 static bool tryToRecognizeReverseFunction(Instruction &I){
   if(I.getOpcode!=Instruction::Or)
@@ -294,30 +299,41 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
   Value *Op0 = I.getOperand(0);
   Value *Op1 = I.getOperand(1);
   Value *MulOp0;
-  
+  //------------
+  //Petar's insertion! Aditional variables!
+  Value *value1; 
+
   // I need to change this part!
-  // Matching "(i * 0x01010101...) >> 24".
- 
-  //   (x << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24));
-  if ((match(Op0, m_Shl(m_Value(MulOp0), m_SpecificInt(Mask01)))) &&
-      match(Op1, m_SpecificInt(MaskShift))) {
+  // Matching "(i * 0x01010101...) >> 24" <- popCount function instruction!
+  // Matching  "(x << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24))" <- reverse function instruction! (Petar)
+  if ((match(MulOp0, m_Or(m_Shl(m_Value(MulOp0), m_SpecificInt(MaskShift)),
+      m_Or(m_Shl(m_And(m_Deferred(MulOp0), m_SpecificInt(65280)), m_SpecificInt(8)), 
+      m_Or(m_And(m_LShr(m_Deferred(MulOp0), m_SpecificInt(8)), m_SpecificInt(65280)), m_LShr(m_Deferred(MulOp0), m_SpecificInt(24)))))))) {
+        
+    // I hope we recognised the previous instruction! (Petar)
+
     Value *ShiftOp0;
-    // Matching "((i + (i >> 4)) & 0x0F0F0F0F...)".
-    if (match(MulOp0, m_And(m_c_Add(m_LShr(m_Value(ShiftOp0), m_SpecificInt(4)),
-                                    m_Deferred(ShiftOp0)),
-                            m_SpecificInt(Mask0F)))) {
-      Value *AndOp0;
-      // Matching "(i & 0x33333333...) + ((i >> 2) & 0x33333333...)".
-      if (match(ShiftOp0,
-                m_c_Add(m_And(m_Value(AndOp0), m_SpecificInt(Mask33)),
-                        m_And(m_LShr(m_Deferred(AndOp0), m_SpecificInt(2)),
-                              m_SpecificInt(Mask33))))) {
-        Value *Root, *SubOp1;
-        // Matching "i - ((i >> 1) & 0x55555555...)".
-        if (match(AndOp0, m_Sub(m_Value(Root), m_Value(SubOp1))) &&
-            match(SubOp1, m_And(m_LShr(m_Specific(Root), m_SpecificInt(1)),
-                                m_SpecificInt(Mask55)))) {
-          LLVM_DEBUG(dbgs() << "Recognized popcount intrinsic\n");
+    // Matching "((i + (i >> 4)) & 0x0F0F0F0F...)" <- popCount function instruction!
+    // matching ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F) <- reverse function instruction!
+    if(match(MulOp0, m_Or(m_Shl(m_And(m_Value(MulOp0), m_SpecificInt(Mask0F)), m_SpecificInt(4)), 
+      m_and(m_LShr(m_Deferred(MulOp0), m_SpecificInt(4)), m_SpecificInt(Mask0F))))){
+
+      // I hope we recognised the previous instruction! (Petar)
+      //Value *AndOp0;
+
+      // Matching ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333) <- reverse function instruction! (Petar)
+      if (match(MulOp0, m_Or(m_Shl(m_And(m_Value(MulOp0), m_SpecificInt(Mask33)), m_SpecificInt(2)), 
+        m_And(m_LShr(m_Deferred(MulOp0), m_SpecificInt(2)), m_SpecificInt(Mask33))))) {
+        
+        // I hope we recognised the previous instruction! (Petar)
+        //Value *Root, *SubOp1;
+
+        // Matching "((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555))" <- reverse function instruction! (Petar)
+        if (match(MulOp0, m_Or(m_Shl(m_And(m_Value(MulOp0), m_SpecificInt(Mask55)), m_SpecificInt(1)), 
+          m_And(m_LShr(m_Deferred(MulOp0), m_SpecificInt(1)), m_SpecificInt(Mask55))))) {
+          
+          // I hope we recognised the previous instruction! (Petar)
+          LLVM_DEBUG(dbgs() << "Recognized reverse function!\n");
           IRBuilder<> Builder(&I);
           Function *Func = Intrinsic::getDeclaration(
               I.getModule(), Intrinsic::ctpop, I.getType());
@@ -326,8 +342,9 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
           return true;
         }
       }
-  }       
-}
+    }       
+  }
+}  
 
 //---------------------------------------------------------------------------------------------------------------------------------------
 
