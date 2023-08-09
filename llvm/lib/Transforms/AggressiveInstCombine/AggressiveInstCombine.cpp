@@ -338,12 +338,15 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
           // I hope we recognised the previous instruction! (Petar)
           LLVM_DEBUG(dbgs() << "Recognized reverse function!\n");
           IRBuilder<> Builder(&I);
+          
           /*
           Function *Func = Intrinsic::getDeclaration(
               I.getModule(), Intrinsic::ctpop, I.getType());
           */    
-          I.replaceAllUsesWith(Builder.CreateCall(Func, {Root}));
-          ++NumPopCountRecognized;
+          
+          //I.replaceAllUsesWith(Builder.CreateCall(Func, {Root}));
+          //++NumReverseRecognized;
+          
           return true;
         }
       }
