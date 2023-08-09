@@ -301,19 +301,17 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
   Value *MulOp0;
   //------------
   //Petar's insertion! Aditional variables!
-  Value *value1; 
+  //Value *value1; 
 
   // I need to change this part!
-  // Matching "(i * 0x01010101...) >> 24" <- popCount function instruction!
   // Matching  "(x << 24) | ((x & 0xFF00) << 8) | ((x >> 8) & 0xFF00) | (x >> 24))" <- reverse function instruction! (Petar)
   if ((match(MulOp0, m_Or(m_Shl(m_Value(MulOp0), m_SpecificInt(MaskShift)),
       m_Or(m_Shl(m_And(m_Deferred(MulOp0), m_SpecificInt(65280)), m_SpecificInt(8)), 
       m_Or(m_And(m_LShr(m_Deferred(MulOp0), m_SpecificInt(8)), m_SpecificInt(65280)), m_LShr(m_Deferred(MulOp0), m_SpecificInt(24)))))))) {
         
     // I hope we recognised the previous instruction! (Petar)
+    //Value *ShiftOp0;
 
-    Value *ShiftOp0;
-    // Matching "((i + (i >> 4)) & 0x0F0F0F0F...)" <- popCount function instruction!
     // matching ((x & 0x0F0F0F0F) <<  4) | ((x >>  4) & 0x0F0F0F0F) <- reverse function instruction!
     if(match(MulOp0, m_Or(m_Shl(m_And(m_Value(MulOp0), m_SpecificInt(Mask0F)), m_SpecificInt(4)), 
       m_and(m_LShr(m_Deferred(MulOp0), m_SpecificInt(4)), m_SpecificInt(Mask0F))))){
