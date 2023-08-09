@@ -43,6 +43,11 @@ STATISTIC(NumGuardedFunnelShifts,
           "Number of guarded funnel shifts transformed into funnel shifts");
 STATISTIC(NumPopCountRecognized, "Number of popcount idioms recognized");
 
+/*
+Petar's potential insertion!
+STATISTIC(NumReverseRecognized, "Number of reverse function recognized");
+*/
+
 static cl::opt<unsigned> MaxInstrsToScan(
     "aggressive-instcombine-max-scan-instrs", cl::init(64), cl::Hidden,
     cl::desc("Max number of instructions to scan for aggressive instcombine."));
@@ -333,8 +338,10 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
           // I hope we recognised the previous instruction! (Petar)
           LLVM_DEBUG(dbgs() << "Recognized reverse function!\n");
           IRBuilder<> Builder(&I);
+          /*
           Function *Func = Intrinsic::getDeclaration(
               I.getModule(), Intrinsic::ctpop, I.getType());
+          */    
           I.replaceAllUsesWith(Builder.CreateCall(Func, {Root}));
           ++NumPopCountRecognized;
           return true;
