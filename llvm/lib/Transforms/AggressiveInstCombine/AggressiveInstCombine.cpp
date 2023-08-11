@@ -690,6 +690,7 @@ define internal i32 @singletable_crc32c(i32 %0, i8* %1, i64 %2) #0 {
 }
 */
 static bool tryToRecognizeTableBasedCRC32(Function &F){
+    //Brute force pattern matching!
     int step=1;
 
     for(BasicBlock& BB: F){
