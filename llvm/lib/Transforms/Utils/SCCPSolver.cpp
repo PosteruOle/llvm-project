@@ -17,6 +17,7 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/ValueLattice.h"
 #include "llvm/Analysis/ValueLatticeUtils.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -104,15 +105,14 @@ bool SCCPSolver::tryToReplaceWithConstant(Value *V) {
 
 /// Try to use \p Inst's value range from \p Solver to infer the NUW flag.
 static bool refineInstruction(SCCPSolver &Solver,
-                              const SmallPtrSetImpl<Value *> &InsertedValues,
                               Instruction &Inst) {
   if (!isa<OverflowingBinaryOperator>(Inst))
     return false;
 
-  auto GetRange = [&Solver, &InsertedValues](Value *Op) {
+  auto GetRange = [&Solver](Value *Op) {
     if (auto *Const = dyn_cast<ConstantInt>(Op))
       return ConstantRange(Const->getValue());
-    if (isa<Constant>(Op) || InsertedValues.contains(Op)) {
+    if (isa<Constant>(Op)) {
       unsigned Bitwidth = Op->getType()->getScalarSizeInBits();
       return ConstantRange::getFull(Bitwidth);
     }
@@ -145,7 +145,6 @@ static bool refineInstruction(SCCPSolver &Solver,
 
 /// Try to replace signed instructions with their unsigned equivalent.
 static bool replaceSignedInst(SCCPSolver &Solver,
-                              SmallPtrSetImpl<Value *> &InsertedValues,
                               Instruction &Inst) {
   // Determine if a signed value is known to be >= 0.
   auto isNonNegative = [&Solver](Value *V) {
@@ -167,7 +166,7 @@ static bool replaceSignedInst(SCCPSolver &Solver,
   case Instruction::SExt: {
     // If the source value is not negative, this is a zext.
     Value *Op0 = Inst.getOperand(0);
-    if (InsertedValues.count(Op0) || !isNonNegative(Op0))
+    if (!isNonNegative(Op0))
       return false;
     NewInst = new ZExtInst(Op0, Inst.getType(), "", &Inst);
     break;
@@ -175,7 +174,7 @@ static bool replaceSignedInst(SCCPSolver &Solver,
   case Instruction::AShr: {
     // If the shifted value is not negative, this is a logical shift right.
     Value *Op0 = Inst.getOperand(0);
-    if (InsertedValues.count(Op0) || !isNonNegative(Op0))
+    if (!isNonNegative(Op0))
       return false;
     NewInst = BinaryOperator::CreateLShr(Op0, Inst.getOperand(1), "", &Inst);
     break;
@@ -184,8 +183,7 @@ static bool replaceSignedInst(SCCPSolver &Solver,
   case Instruction::SRem: {
     // If both operands are not negative, this is the same as udiv/urem.
     Value *Op0 = Inst.getOperand(0), *Op1 = Inst.getOperand(1);
-    if (InsertedValues.count(Op0) || InsertedValues.count(Op1) ||
-        !isNonNegative(Op0) || !isNonNegative(Op1))
+    if (!isNonNegative(Op0) || !isNonNegative(Op1))
       return false;
     auto NewOpcode = Inst.getOpcode() == Instruction::SDiv ? Instruction::UDiv
                                                            : Instruction::URem;
@@ -199,15 +197,13 @@ static bool replaceSignedInst(SCCPSolver &Solver,
   // Wire up the new instruction and update state.
   assert(NewInst && "Expected replacement instruction");
   NewInst->takeName(&Inst);
-  InsertedValues.insert(NewInst);
   Inst.replaceAllUsesWith(NewInst);
-  Solver.removeLatticeValueFor(&Inst);
+  Solver.moveLatticeValue(&Inst, NewInst);
   Inst.eraseFromParent();
   return true;
 }
 
 bool SCCPSolver::simplifyInstsInBlock(BasicBlock &BB,
-                                      SmallPtrSetImpl<Value *> &InsertedValues,
                                       Statistic &InstRemovedStat,
                                       Statistic &InstReplacedStat) {
   bool MadeChanges = false;
@@ -220,10 +216,10 @@ bool SCCPSolver::simplifyInstsInBlock(BasicBlock &BB,
 
       MadeChanges = true;
       ++InstRemovedStat;
-    } else if (replaceSignedInst(*this, InsertedValues, Inst)) {
+    } else if (replaceSignedInst(*this, Inst)) {
       MadeChanges = true;
       ++InstReplacedStat;
-    } else if (refineInstruction(*this, InsertedValues, Inst)) {
+    } else if (refineInstruction(*this, Inst)) {
       MadeChanges = true;
     }
   }
@@ -386,7 +382,8 @@ class SCCPInstVisitor : public InstVisitor<SCCPInstVisitor> {
   using Edge = std::pair<BasicBlock *, BasicBlock *>;
   DenseSet<Edge> KnownFeasibleEdges;
 
-  DenseMap<Function *, AnalysisResultsForFn> AnalysisResults;
+  DenseMap<Function *, std::unique_ptr<PredicateInfo>> FnPredicateInfo;
+
   DenseMap<Value *, SmallPtrSet<User *, 2>> AdditionalUsers;
 
   LLVMContext &Ctx;
@@ -612,6 +609,7 @@ private:
   void visitCastInst(CastInst &I);
   void visitSelectInst(SelectInst &I);
   void visitUnaryOperator(Instruction &I);
+  void visitFreezeInst(FreezeInst &I);
   void visitBinaryOperator(Instruction &I);
   void visitCmpInst(CmpInst &I);
   void visitExtractValueInst(ExtractValueInst &EVI);
@@ -649,8 +647,8 @@ private:
   void visitInstruction(Instruction &I);
 
 public:
-  void addAnalysis(Function &F, AnalysisResultsForFn A) {
-    AnalysisResults.insert({&F, std::move(A)});
+  void addPredicateInfo(Function &F, DominatorTree &DT, AssumptionCache &AC) {
+    FnPredicateInfo.insert({&F, std::make_unique<PredicateInfo>(F, DT, AC)});
   }
 
   void visitCallInst(CallInst &I) { visitCallBase(I); }
@@ -658,16 +656,10 @@ public:
   bool markBlockExecutable(BasicBlock *BB);
 
   const PredicateBase *getPredicateInfoFor(Instruction *I) {
-    auto A = AnalysisResults.find(I->getParent()->getParent());
-    if (A == AnalysisResults.end())
+    auto It = FnPredicateInfo.find(I->getParent()->getParent());
+    if (It == FnPredicateInfo.end())
       return nullptr;
-    return A->second.PredInfo->getPredicateInfoFor(I);
-  }
-
-  DomTreeUpdater getDTU(Function &F) {
-    auto A = AnalysisResults.find(&F);
-    assert(A != AnalysisResults.end() && "Need analysis results for function.");
-    return {A->second.DT, A->second.PDT, DomTreeUpdater::UpdateStrategy::Lazy};
+    return It->second->getPredicateInfoFor(I);
   }
 
   SCCPInstVisitor(const DataLayout &DL,
@@ -734,7 +726,11 @@ public:
     return StructValues;
   }
 
-  void removeLatticeValueFor(Value *V) { ValueState.erase(V); }
+  void moveLatticeValue(Value *From, Value *To) {
+    assert(ValueState.count(From) && "From is not existed in ValueState");
+    ValueState[To] = ValueState[From];
+    ValueState.erase(From);
+  }
 
   /// Invalidate the Lattice Value of \p Call and its users after specializing
   /// the call. Then recompute it.
@@ -1397,6 +1393,30 @@ void SCCPInstVisitor::visitUnaryOperator(Instruction &I) {
   markOverdefined(&I);
 }
 
+void SCCPInstVisitor::visitFreezeInst(FreezeInst &I) {
+  // If this freeze returns a struct, just mark the result overdefined.
+  // TODO: We could do a lot better than this.
+  if (I.getType()->isStructTy())
+    return (void)markOverdefined(&I);
+
+  ValueLatticeElement V0State = getValueState(I.getOperand(0));
+  ValueLatticeElement &IV = ValueState[&I];
+  // resolvedUndefsIn might mark I as overdefined. Bail out, even if we would
+  // discover a concrete value later.
+  if (SCCPSolver::isOverdefined(IV))
+    return (void)markOverdefined(&I);
+
+  // If something is unknown/undef, wait for it to resolve.
+  if (V0State.isUnknownOrUndef())
+    return;
+
+  if (SCCPSolver::isConstant(V0State) &&
+      isGuaranteedNotToBeUndefOrPoison(getConstant(V0State)))
+    return (void)markConstant(IV, &I, getConstant(V0State));
+
+  markOverdefined(&I);
+}
+
 // Handle Binary Operators.
 void SCCPInstVisitor::visitBinaryOperator(Instruction &I) {
   ValueLatticeElement V1State = getValueState(I.getOperand(0));
@@ -1758,6 +1778,8 @@ void SCCPInstVisitor::handleCallResult(CallBase &CB) {
       SmallVector<ConstantRange, 2> OpRanges;
       for (Value *Op : II->args()) {
         const ValueLatticeElement &State = getValueState(Op);
+        if (State.isUnknownOrUndef())
+          return;
         OpRanges.push_back(getConstantRange(State, Op->getType()));
       }
 
@@ -1943,8 +1965,9 @@ SCCPSolver::SCCPSolver(
 
 SCCPSolver::~SCCPSolver() = default;
 
-void SCCPSolver::addAnalysis(Function &F, AnalysisResultsForFn A) {
-  return Visitor->addAnalysis(F, std::move(A));
+void SCCPSolver::addPredicateInfo(Function &F, DominatorTree &DT,
+                                  AssumptionCache &AC) {
+  Visitor->addPredicateInfo(F, DT, AC);
 }
 
 bool SCCPSolver::markBlockExecutable(BasicBlock *BB) {
@@ -1954,8 +1977,6 @@ bool SCCPSolver::markBlockExecutable(BasicBlock *BB) {
 const PredicateBase *SCCPSolver::getPredicateInfoFor(Instruction *I) {
   return Visitor->getPredicateInfoFor(I);
 }
-
-DomTreeUpdater SCCPSolver::getDTU(Function &F) { return Visitor->getDTU(F); }
 
 void SCCPSolver::trackValueOfGlobalVariable(GlobalVariable *GV) {
   Visitor->trackValueOfGlobalVariable(GV);
@@ -2013,8 +2034,8 @@ SCCPSolver::getStructLatticeValueFor(Value *V) const {
   return Visitor->getStructLatticeValueFor(V);
 }
 
-void SCCPSolver::removeLatticeValueFor(Value *V) {
-  return Visitor->removeLatticeValueFor(V);
+void SCCPSolver::moveLatticeValue(Value *From, Value *To) {
+  return Visitor->moveLatticeValue(From, To);
 }
 
 void SCCPSolver::resetLatticeValueFor(CallBase *Call) {
