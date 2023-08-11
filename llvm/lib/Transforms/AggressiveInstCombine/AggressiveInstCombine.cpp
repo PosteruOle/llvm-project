@@ -720,7 +720,7 @@ static bool tryToRecognizeTableBasedCRC32(Function &F){
       } else if(step==2){
         /*
         if(BB.getName() != "while.cond")
-          return name;
+          return false;
         */  
         int count=1;
         for(Instruction& I: BB){
@@ -747,7 +747,7 @@ static bool tryToRecognizeTableBasedCRC32(Function &F){
         int count=1;
         /*
         if(BB.getName() != "while.body")
-          return name;
+          return false;
         */
         
         for(Instruction& I: BB){
