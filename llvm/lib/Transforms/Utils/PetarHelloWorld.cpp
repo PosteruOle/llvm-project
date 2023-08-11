@@ -12,8 +12,10 @@ PreservedAnalyses PetarHelloWorldPass::run(Function &F, FunctionAnalysisManager 
   errs() << "\n-------------------------------\n";
   errs() << "Instructions within this function!\n";
   for(BasicBlock& BB: F){
+    errs() << "Here?!\n";
+    errs() << "Basic block: " << BB.getName() << "...\n";
     for(Instruction& I: BB){
-       errs()<< I.getName() << "\n";
+       errs()<< "Instruction: " << I.getName() << "\n";
        
        if(CallBase::classof(&I)){
           CallBase* callBase = (CallBase*) &I;
