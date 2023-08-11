@@ -305,9 +305,9 @@ static bool tryToRecognizeReverseFunction(Instruction &I){
   APInt Mask0F = APInt::getSplat(Len, APInt(8, 0x0F));
   APInt Mask01 = APInt::getSplat(Len, APInt(8, 0x01));
   APInt MaskShift = APInt(Len, Len - 8); 
-
-  Value *Op0 = I.getOperand(0);
-  Value *Op1 = I.getOperand(1);
+ 
+  //Value *Op0 = I.getOperand(0);
+  //Value *Op1 = I.getOperand(1);
   Value *MulOp0;
   
   //Petar's insertion! Aditional variables!
@@ -698,23 +698,41 @@ static bool tryToRecognizeTableBasedCRC32(Function &F){
         //auto it=BB.getInstList().begin();
         int count=1;
         for(Instruction& I: BB){
-          if(count<=4 && !dyn_cast<AllocaInst>I)
-            return false;
+          if(count<=4 ){
+            AllocaInst *II= dyn_cast<AllocaInst>(&I);
+            if(!II)
+              return false;
+          }  
           
-          if(count>=5 && count<=7 && !dyn_cast<StoreInst>I)
-            return false;
+          if(count>=5 && count<=7){
+            StoreInst* II=dyn_cast<StoreInst>(&I);
+            if(!II)
+              return false;
+          }  
 
-          if(count==8 && !dyn_cast<LoadInst>I)
-            return false;
+          if(count==8){
+            LoadInst* II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }  
 
-          if(count==9 && !dyn_cast<BitCastInst>I)
-            return false;
+          if(count==9){
+            BitCastInst *II=dyn_cast<BitCastInst>(&I);
+            if(!II)
+              return false;
+          }
 
-          if(count==10 && !dyn_cast<StoreInst>I)
-            return false;
+          if(count==10){
+            StoreInst *II=dyn_cast<StoreInst>(&I);
+            if(!II)
+              return false;
+          }
 
-          if(count==11 && !dyn_cast<BranchInst>I)
-            return false;
+          if(count==11){
+            BranchInst *II=dyn_cast<BranchInst>(&I);
+            if(!II)
+              return false;
+          }
           count++;  
         }
       } else if(step==2){
@@ -724,24 +742,36 @@ static bool tryToRecognizeTableBasedCRC32(Function &F){
         */  
         int count=1;
         for(Instruction& I: BB){
-           Value *help1;
-           Value *help2;
-           if(count==1 && !dyn_cast<LoadInst>I)
-             return false;
+          Value *help1;
+          Value *help2;
+          if(count==1){
+            LoadInst *II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==2 && !match(help1, m_Add(m_Value(help2), m_SpecificInt(-1))))
-             return false;
+          if(count==2 && !match(help1, m_Add(m_Value(help2), m_SpecificInt(-1))))
+            return false;
            
-           if(count==3 && !dyn_cast<StoreInst>I)
-             return false;
+          if(count==3){
+            StoreInst *II=dyn_cast<StoreInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==4 && !dyn_cast<ICmpInst>I)
-             return false;
+          if(count==4){
+            ICmpInst *II=dyn_cast<ICmpInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==5 && !dyn_cast<BranchInst>I)
-             return false;      
+          if(count==5){
+            BranchInst *II=dyn_cast<BranchInst>(&I);
+            if(!II)
+              return false;
+          }   
 
-           count++;   
+          count++;   
         }
       } else if(step==3){
         int count=1;
@@ -751,61 +781,95 @@ static bool tryToRecognizeTableBasedCRC32(Function &F){
         */
         
         for(Instruction& I: BB){
-           Value *help1;
-           Value *help2;
-           Value *help3;
+          Value *help1;
+          Value *help2;
+          Value *help3;
            
-           if(count<=2 && !dyn_cast<LoadInst>I)
-             return false;
+          if(count<=2){
+            LoadInst *II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==3 && !dyn_cast<GetElementPtrInst>I)
-             return false;
+          if(count==3){
+            GetElementPtrInst *II=dyn_cast<GetElementPtrInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==4 && !dyn_cast<StoreInst>I)
-             return false;
+          if(count==4){
+            StoreInst *II=dyn_cast<StoreInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==5 && !dyn_cast<LoadInst>I)
-             return false;
+          if(count==5){
+            LoadInst *II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==6 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
-             return false;
+          if(count==6 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
+            return false;
            
-           if(count==7 && !match(help1, m_And(m_Value(help2), m_Value(help3))))
-             return false;
+          if(count==7 && !match(help1, m_And(m_Value(help2), m_Value(help3))))
+            return false;
            
-           if(count==8 && !dyn_cast<ZExtInst>I)
-             return false;          
+          if(count==8){
+            ZExtInst *II=dyn_cast<ZExtInst>(&I);
+            if(!II)
+              return false;
+          }         
            
-           if(count==9 && !dyn_cast<GetElementPtrInst>I)
-             return false;
+          if(count==9){
+            GetElementPtrInst *II=dyn_cast<GetElementPtrInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count>=10 && count<=11 && !dyn_cast<LoadInst>I)
-             return false;
+          if(count>=10 && count<=11){
+            LoadInst *II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==12 && !match(help1, m_LShr(m_Value(help2), m_Value(help3))))
-             return false;
+          if(count==12 && !match(help1, m_LShr(m_Value(help2), m_Value(help3))))
+            return false;
            
-           if(count==13 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
-             return false;
+          if(count==13 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
+            return false;
            
-           if(count==14 && !dyn_cast<StoreInst>I)
-             return false;
+          if(count==14){
+            StoreInst *II=dyn_cast<StoreInst>(&I);
+            if(!II)
+              return false;
+          }
            
-           if(count==15 && !dyn_cast<BranchInst>I)
-             return false;            
+          if(count==15){
+            BranchInst *II=dyn_cast<BranchInst>(&I);
+            if(!II)
+              return false;
+          }           
            
-           count++;   
+          count++;   
         }
       } else {
         int count=1;
         
-        if(count==1 && !dyn_cast<LoadInst>I)
-          return false;
-        
-        if(count==2 && !dyn_cast<ReturnInst>I)
-          return false;
-
-        count++;  
+        for(Instruction& I: BB){
+          if(count==1){
+            LoadInst *II=dyn_cast<LoadInst>(&I);
+            if(!II)
+              return false;
+          }
+          
+          if(count==2){
+            ReturnInst *II=dyn_cast<ReturnInst>(&I);
+            if(!II)
+              return false;
+          }
+          count++;
+        }
       }
       step++;
     }
