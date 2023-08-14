@@ -114,6 +114,11 @@ using namespace llvm::PatternMatch;
 
 STATISTIC(NumWorklistIterations,
           "Number of instruction combining iterations performed");
+STATISTIC(NumOneIteration, "Number of functions with one iteration");
+STATISTIC(NumTwoIterations, "Number of functions with two iterations");
+STATISTIC(NumThreeIterations, "Number of functions with three iterations");
+STATISTIC(NumFourOrMoreIterations,
+          "Number of functions with four or more iterations");
 
 STATISTIC(NumCombined , "Number of insts combined");
 STATISTIC(NumConstProp, "Number of constant folds");
@@ -2464,32 +2469,8 @@ Instruction *InstCombinerImpl::visitFree(CallInst &FI, Value *Op) {
   return nullptr;
 }
 
-static bool isMustTailCall(Value *V) {
-  if (auto *CI = dyn_cast<CallInst>(V))
-    return CI->isMustTailCall();
-  return false;
-}
-
 Instruction *InstCombinerImpl::visitReturnInst(ReturnInst &RI) {
-  if (RI.getNumOperands() == 0) // ret void
-    return nullptr;
-
-  Value *ResultOp = RI.getOperand(0);
-  Type *VTy = ResultOp->getType();
-  if (!VTy->isIntegerTy() || isa<Constant>(ResultOp))
-    return nullptr;
-
-  // Don't replace result of musttail calls.
-  if (isMustTailCall(ResultOp))
-    return nullptr;
-
-  // There might be assume intrinsics dominating this return that completely
-  // determine the value. If so, constant fold it.
-  KnownBits Known = computeKnownBits(ResultOp, 0, &RI);
-  if (Known.isConstant())
-    return replaceOperand(RI, 0,
-        Constant::getIntegerValue(VTy, Known.getConstant()));
-
+  // Nothing for now.
   return nullptr;
 }
 
@@ -2570,6 +2551,16 @@ static bool handlePotentiallyDeadBlock(BasicBlock *BB, InstCombiner &IC) {
     IC.eraseInstFromFunction(Inst);
     Changed = true;
   }
+
+  // Replace phi node operands in successor blocks with poison.
+  for (BasicBlock *Succ : successors(BB))
+    for (PHINode &PN : Succ->phis())
+      for (Use &U : PN.incoming_values())
+        if (PN.getIncomingBlock(U) == BB && !isa<PoisonValue>(U)) {
+          IC.replaceUse(U, PoisonValue::get(PN.getType()));
+          IC.addToWorklist(&PN);
+          Changed = true;
+        }
 
   // TODO: Successor blocks may also be dead.
   return Changed;
@@ -4075,6 +4066,15 @@ static bool combineInstructionsOverFunction(
     MadeIRChange = true;
   }
 
+  if (Iteration == 1)
+    ++NumOneIteration;
+  else if (Iteration == 2)
+    ++NumTwoIterations;
+  else if (Iteration == 3)
+    ++NumThreeIterations;
+  else
+    ++NumFourOrMoreIterations;
+
   return MadeIRChange;
 }
 
@@ -4161,18 +4161,13 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
       nullptr;
 
   return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, TTI, DT, ORE,
-                                         BFI, PSI, MaxIterations, LI);
+                                         BFI, PSI,
+                                         InstCombineDefaultMaxIterations, LI);
 }
 
 char InstructionCombiningPass::ID = 0;
 
-InstructionCombiningPass::InstructionCombiningPass()
-    : FunctionPass(ID), MaxIterations(InstCombineDefaultMaxIterations) {
-  initializeInstructionCombiningPassPass(*PassRegistry::getPassRegistry());
-}
-
-InstructionCombiningPass::InstructionCombiningPass(unsigned MaxIterations)
-    : FunctionPass(ID), MaxIterations(MaxIterations) {
+InstructionCombiningPass::InstructionCombiningPass() : FunctionPass(ID) {
   initializeInstructionCombiningPassPass(*PassRegistry::getPassRegistry());
 }
 
@@ -4197,8 +4192,4 @@ void llvm::initializeInstCombine(PassRegistry &Registry) {
 
 FunctionPass *llvm::createInstructionCombiningPass() {
   return new InstructionCombiningPass();
-}
-
-FunctionPass *llvm::createInstructionCombiningPass(unsigned MaxIterations) {
-  return new InstructionCombiningPass(MaxIterations);
 }

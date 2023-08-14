@@ -5293,12 +5293,7 @@ llvm::Constant *CGObjCCommonMac::GetClassName(StringRef RuntimeName) {
 }
 
 llvm::Function *CGObjCCommonMac::GetMethodDefinition(const ObjCMethodDecl *MD) {
-  llvm::DenseMap<const ObjCMethodDecl*, llvm::Function*>::iterator
-      I = MethodDefinitions.find(MD);
-  if (I != MethodDefinitions.end())
-    return I->second;
-
-  return nullptr;
+  return MethodDefinitions.lookup(MD);
 }
 
 /// GetIvarLayoutName - Returns a unique constant for the given
@@ -7229,7 +7224,7 @@ CGObjCNonFragileABIMac::EmitIvarOffset(CodeGen::CodeGenFunction &CGF,
                                       CGF.getSizeAlign(), "ivar");
     if (IsIvarOffsetKnownIdempotent(CGF, Ivar))
       cast<llvm::LoadInst>(IvarOffsetValue)
-          ->setMetadata(CGM.getModule().getMDKindID("invariant.load"),
+          ->setMetadata(llvm::LLVMContext::MD_invariant_load,
                         llvm::MDNode::get(VMContext, std::nullopt));
   }
 
@@ -7629,7 +7624,7 @@ llvm::Value *CGObjCNonFragileABIMac::EmitSelector(CodeGenFunction &CGF,
   Address Addr = EmitSelectorAddr(Sel);
 
   llvm::LoadInst* LI = CGF.Builder.CreateLoad(Addr);
-  LI->setMetadata(CGM.getModule().getMDKindID("invariant.load"),
+  LI->setMetadata(llvm::LLVMContext::MD_invariant_load,
                   llvm::MDNode::get(VMContext, std::nullopt));
   return LI;
 }
