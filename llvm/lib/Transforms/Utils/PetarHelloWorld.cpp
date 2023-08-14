@@ -15,16 +15,19 @@ PreservedAnalyses PetarHelloWorldPass::run(Function &F, FunctionAnalysisManager 
     errs() << "Here?!\n";
     errs() << "Basic block: " << BB.getName() << "...\n";
     for(Instruction& I: BB){
-       errs()<< "Instruction: " << I.getName() << "\n";
-       
-       if(CallBase::classof(&I)){
-          CallBase* callBase = (CallBase*) &I;
-          StringRef functionName = callBase->getCalledFunction()->getName();
-          if(llvmcttzRegex.match(functionName)){
-            errs() << "Look what we have found -> " << functionName << "\n";
-            count_cttz_intrinsic_appearance++;
-          }  
-       }     
+      //errs()<< "Instruction: " << I.getName() << "\n";
+      errs() << "Instruction value name: " << I.getValueName() << "\n";
+      errs() << "Instruction type: " << I.getType() << "\n";
+      //errs() << CallBase::classof(&I) << "\n"; 
+      if(CallBase::classof(&I)){
+        CallBase* callBase = (CallBase*) &I;
+        StringRef functionName = callBase->getCalledFunction()->getName();
+        //errs() << "Instruction name: " << functionName << "\n";
+        if(llvmcttzRegex.match(functionName)){
+          errs() << "Look what we have found -> " << functionName << "\n";
+          count_cttz_intrinsic_appearance++;
+        }  
+      }     
     }
   }
   errs() << "\n-------------------------------\n";

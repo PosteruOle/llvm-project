@@ -689,7 +689,147 @@ define internal i32 @singletable_crc32c(i32 %0, i8* %1, i64 %2) #0 {
   ret i32 %28
 }
 */
-static bool tryToRecognizeTableBasedCRC32(Function &F){
+static bool tryToRecognizeTableBasedCRC32(Instruction &I){
+  LoadInst *LI = dyn_cast<LoadInst>(&I);
+  if (!LI)
+    return false;
+
+  Type *AccessType = LI->getType();
+  if (!AccessType->isIntegerTy())
+    return false;
+
+  BranchInst *BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  if(!BI)
+    return false;
+
+  StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  Instruction *II=dyn_cast<Instruction>(SI->getPrevNode());
+  Value *help1;
+  Value *help2;
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+    return false;
+  
+  II=dyn_cast<Instruction>(II->getPrevNode());
+  
+  if(!match(II, m_LShr(m_Value(help1), m_SpecificInt(8))))
+    return false;   
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(LI->getPrevNode());
+  if(!LI)
+    return false;
+
+  GetElementPtrInst *GEPI=dyn_cast<GetElementPtrInst>(LI->getPrevNode());
+  if(!GEPI)
+    return false;
+
+  ZExtInst *ZI=dyn_cast<ZExtInst>(GEPI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  II=dyn_cast<Instruction>(ZI->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_Value(help2))))
+    return false;
+  
+  II=dyn_cast<Instruction>(II->getPrevNode());
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  GEPI=dyn_cast<GetElementPtrInst>(SI->getPrevNode());
+  if(!GEPI)
+    return false; 
+
+  LI=dyn_cast<LoadInst>(GEPI->getPrevNode());
+  if(!LI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(LI->getPrevNode());
+  if(!LI)
+    return false;
+
+  BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  if(!BI)
+    return false;
+
+  ICmpInst *ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+  
+  SI=dyn_cast<StoreInst>(ICMPI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+  
+  BitCastInst *BCI=dyn_cast<BitCastInst>(SI->getPrevNode());
+  if(!BCI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(BCI->getPrevNode());
+  if(!LI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;      
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false; 
+
+  AllocaInst *AI=dyn_cast<AllocaInst>(SI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+  
+  errs() << "Table-based CRC32 algorithm is finally revognized!" << "\n";
+
+  return true;
+}
+static bool tryToRecognizeTableBasedCRC32BruteForce(Function &F){
     //Brute force pattern matching!
     int step=1;
 
