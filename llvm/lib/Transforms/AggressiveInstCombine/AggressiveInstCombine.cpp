@@ -1520,6 +1520,8 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
       MadeChange |= flag;
       if(flag)
         errs() << "Function we have created seems to work properly!\n";
+      else
+        errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
       MadeChange |= tryToFPToSat(I, TTI);
       MadeChange |= tryToRecognizeTableBasedCttz(I);
       MadeChange |= foldConsecutiveLoads(I, DL, TTI, AA, DT);
