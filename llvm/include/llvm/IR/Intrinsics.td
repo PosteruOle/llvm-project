@@ -1305,6 +1305,7 @@ let IntrProperties = [IntrNoMem, IntrSpeculatable, IntrWillReturn,
                       ImmArg<ArgIndex<1>>] in {
   def int_ctlz : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, llvm_i1_ty]>;
   def int_cttz : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, llvm_i1_ty]>;
+  def int_crc : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, llvm_i1_ty]>;
 }
 
 //===------------------------ Debugger Intrinsics -------------------------===//

@@ -106,6 +106,12 @@ let TargetPrefix = "riscv" in {
   // Zbkx
   def int_riscv_xperm4  : BitManipGPRGPRIntrinsics;
   def int_riscv_xperm8  : BitManipGPRGPRIntrinsics;
+  
+  //CRC - we will check this later!
+  //def int_riscv_crc: BitManipGPRIntrinsics;
+  //def int_ctlz : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, llvm_i1_ty]>;
+  //def int_cttz : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, llvm_i1_ty]>;
+  
 } // TargetPrefix = "riscv"
 
 //===----------------------------------------------------------------------===//
