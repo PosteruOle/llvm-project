@@ -690,33 +690,55 @@ define internal i32 @singletable_crc32c(i32 %0, i8* %1, i64 %2) #0 {
 }
 */
 static bool tryToRecognizeTableBasedCRC32(Instruction &I){
-  LoadInst *LI = dyn_cast<LoadInst>(&I);
+  ReturnInst *RI=dyn_cast<ReturnInst>(&I);
+  if(!RI)
+    return false;
+
+  LoadInst *LI = dyn_cast<LoadInst>(RI->getPrevNode());
   if (!LI)
     return false;
-
-  Type *AccessType = LI->getType();
-  if (!AccessType->isIntegerTy())
+  
+  //return true;
+  //errs() << "Why here, sir?!" << "\n";
+  //errs() << "Why here, sir2?!" << "\n";
+  //errs() << "Why here, sir3?!" << "\n";
+  BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  
+  /*
+  Instruction* III=dyn_cast<Instruction>(&BB->back());
+  //errs() << "Why here, miss?!" << "\n";
+  if(!III){
+    errs() << "Why here?!" << "\n";
     return false;
-
-  BranchInst *BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  } 
+  */ 
+  
+  BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
+  //errs() << "Why here, miss?!" << "\n";
   if(!BI)
     return false;
+  
 
+  //StoreInst *SI=dyn_cast<StoreInst>(III->getPrevNode());
   StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
   if(!SI)
     return false;
+
+  
+  //------------------------------------------------------------------------------------------------------------------------------------------------- 
+  //return true;
 
   Instruction *II=dyn_cast<Instruction>(SI->getPrevNode());
   Value *help1;
   Value *help2;
   if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
     return false;
-  
+
   II=dyn_cast<Instruction>(II->getPrevNode());
   
   if(!match(II, m_LShr(m_Value(help1), m_SpecificInt(8))))
-    return false;   
-
+    return false;     
+  
   LI=dyn_cast<LoadInst>(II->getPrevNode());
   if(!LI)
     return false;
@@ -760,10 +782,16 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   LI=dyn_cast<LoadInst>(LI->getPrevNode());
   if(!LI)
     return false;
+  
+  
+  //------------------------------------------------------------------------------------------------------------------------------------------------- 
+  //return true;
 
-  BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+
+  BI=dyn_cast<BranchInst>(&BB->back());
   if(!BI)
-    return false;
+    return false;  
 
   ICmpInst *ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
   if(!ICMPI)
@@ -780,8 +808,13 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   LI=dyn_cast<LoadInst>(II->getPrevNode());
   if(!LI)
     return false;
+  
+  //------------------------------------------------------------------------------------------------------------------------------------------------- 
+  //return true;
 
-  BI=dyn_cast<BranchInst>(LI->getPrevNode());
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+
+  BI=dyn_cast<BranchInst>(&BB->back());
   if(!BI)
     return false;
 
@@ -824,8 +857,10 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   AI=dyn_cast<AllocaInst>(AI->getPrevNode());
   if(!AI)
     return false;
+
   
-  errs() << "Table-based CRC32 algorithm is finally revognized!" << "\n";
+  errs() << "!!!Table-based CRC32 algorithm is finally recognized!!!" << "\n";
+  errs() << "It will be nice if we can check the value of the operands in this algorithm implementation!" << "\n";
 
   return true;
 }
@@ -1504,7 +1539,8 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
     // Ignore unreachable basic blocks.
     if (!DT.isReachableFromEntry(&BB))
       continue;
-
+    
+    //errs() << "Hello from here!" << "\n";
     const DataLayout &DL = F.getParent()->getDataLayout();
 
     // Walk the block backwards for efficiency. We're matching a chain of
@@ -1520,8 +1556,8 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
       MadeChange |= flag;
       if(flag)
         errs() << "Function we have created seems to work properly!\n";
-      else
-        errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
+      //else
+      //errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
       MadeChange |= tryToFPToSat(I, TTI);
       MadeChange |= tryToRecognizeTableBasedCttz(I);
       MadeChange |= foldConsecutiveLoads(I, DL, TTI, AA, DT);
