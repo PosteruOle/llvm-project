@@ -1049,7 +1049,7 @@ static bool tryToRecognizeTableBasedCRC32BruteForce(Function &F){
       step++;
     }
     
-    errs() << "Table-based crc32 algortihm is recognized!" << "\n";
+    errs() << "Table-based crc32 algortihm is recognized using brute force algorithm!" << "\n";
 
     return true;
 }
@@ -1535,6 +1535,11 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
                                 TargetTransformInfo &TTI,
                                 TargetLibraryInfo &TLI, AliasAnalysis &AA) {
   bool MadeChange = false;
+  
+  //bool globalflag=tryToRecognizeTableBasedCRC32BruteForce(F);
+  //if(globalflag)
+  //  errs() << "I am supprised!" << "\n";
+  
   for (BasicBlock &BB : F) {
     // Ignore unreachable basic blocks.
     if (!DT.isReachableFromEntry(&BB))
