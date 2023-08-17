@@ -30,6 +30,7 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/BuildLibCalls.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include <cstring>
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -1054,6 +1055,328 @@ static bool tryToRecognizeTableBasedCRC32BruteForce(Function &F){
     return true;
 }
 
+static bool tryToRecognizeCRC32(Instruction &I){
+  ReturnInst *RI=dyn_cast<ReturnInst>(&I);
+  if(!RI)
+    return false;
+
+  CallInst *CI=dyn_cast<CallInst>(RI->getPrevNode());
+  if(!CI)
+    return false;
+
+  Instruction *II=dyn_cast<Instruction>(CI->getPrevNode());
+  if(!II)
+    return false;
+  
+  Value *help1;
+  Value *help2;
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LoadInst *LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+  
+    
+  BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)       
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;      
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+  
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;    
+  
+  //----------------------------------------------------------------------------------------------------------------------
+  //107. if.else:
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;      
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+  
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  //----------------------------------------------------------------------------------------------------------------------
+  //100. if.then:
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;      
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+  
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Xor(m_Value(help1), m_SpecificInt(79764919))))
+    return false;
+
+  II=dyn_cast<Instruction>(II->getPrevNode());
+  if(!II)
+    return false;  
+  
+  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+  
+  //----------------------------------------------------------------------------------------------------------------------
+  //93. for.body:
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICmpInst *ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICI)
+    return false;
+
+  II=dyn_cast<Instruction>(ICI->getPrevNode());
+  if(!II)
+    return false;
+
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))));
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+  
+  LI=dyn_cast<LoadInst>(LI->getPrevNode());
+  if(!LI)
+    return false;
+
+  //----------------------------------------------------------------------------------------------------------------------
+  //88. for.cond:  
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+  
+  BI=dyn_cast<BranchInst>(&BB->back());  
+  if(!BI)
+    return false;
+
+  ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ICI->getPrevNode());
+  if(!LI)
+    return false;
+
+  //----------------------------------------------------------------------------------------------------------------------
+  //74. while.body:
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+  
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  CI=dyn_cast<CallInst>(SI->getPrevNode());
+  if(!CI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(CI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  ZExtInst *ZI=dyn_cast<ZExtInst>(SI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  GetElementPtrInst *GEPI=dyn_cast<GetElementPtrInst>(LI->getPrevNode());
+  if(!GEPI)
+    return false; 
+
+  SExtInst *SEI=dyn_cast<SExtInst>(GEPI->getPrevNode());
+  if(!SEI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(SEI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  LI=dyn_cast<LoadInst>(LI->getPrevNode());
+  if(!LI)
+    return false;
+
+  //----------------------------------------------------------------------------------------------------------------------
+  //68. while.cond:
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+  
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICI)
+    return false;
+  
+  LI=dyn_cast<LoadInst>(ICI->getPrevNode());
+  if(!LI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(LI->getPrevNode());
+  if(!LI)
+    return false;        
+  
+  //----------------------------------------------------------------------------------------------------------------------
+  //55. entry:
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+  
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;  
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  AllocaInst *AI=dyn_cast<AllocaInst>(SI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;        
+
+  return true;              
+}
 //---------------------------------------------------------------------------------------------------------------------------------------
 
 // Check if this array of constants represents a cttz table.
@@ -1540,40 +1863,51 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
   //if(globalflag)
   //  errs() << "I am supprised!" << "\n";
   
-  for (BasicBlock &BB : F) {
-    // Ignore unreachable basic blocks.
-    if (!DT.isReachableFromEntry(&BB))
-      continue;
-    
-    //errs() << "Hello from here!" << "\n";
-    const DataLayout &DL = F.getParent()->getDataLayout();
+  if(F.getName().str()=="reverse"){
+    errs() << "We won't check this function!" << "\n";
+    return false;
+  } 
+  
+  Module *M=F.getParent();
+  for(Function &F: *M){
+    for (BasicBlock &BB : F) {
+      // Ignore unreachable basic blocks.
+      if (!DT.isReachableFromEntry(&BB))
+        continue;
+      
+      //errs() << "Hello from here!" << "\n";
+      const DataLayout &DL = F.getParent()->getDataLayout();
 
-    // Walk the block backwards for efficiency. We're matching a chain of
-    // use->defs, so we're more likely to succeed by starting from the bottom.
-    // Also, we want to avoid matching partial patterns.
-    // TODO: It would be more efficient if we removed dead instructions
-    // iteratively in this loop rather than waiting until the end.
-    for (Instruction &I : make_early_inc_range(llvm::reverse(BB))) {
-      MadeChange |= foldAnyOrAllBitsSet(I);
-      MadeChange |= foldGuardedFunnelShift(I, DT);
-      MadeChange |= tryToRecognizePopCount(I);
-      bool flag=tryToRecognizeTableBasedCRC32(I);
-      MadeChange |= flag;
-      if(flag)
-        errs() << "Function we have created seems to work properly!\n";
-      //else
-      //errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
-      MadeChange |= tryToFPToSat(I, TTI);
-      MadeChange |= tryToRecognizeTableBasedCttz(I);
-      MadeChange |= foldConsecutiveLoads(I, DL, TTI, AA, DT);
-      MadeChange |= foldPatternedLoads(I, DL);
-      // NOTE: This function introduces erasing of the instruction `I`, so it
-      // needs to be called at the end of this sequence, otherwise we may make
-      // bugs.
-      MadeChange |= foldSqrt(I, TTI, TLI);
+      // Walk the block backwards for efficiency. We're matching a chain of
+      // use->defs, so we're more likely to succeed by starting from the bottom.
+      // Also, we want to avoid matching partial patterns.
+      // TODO: It would be more efficient if we removed dead instructions
+      // iteratively in this loop rather than waiting until the end.
+      for (Instruction &I : make_early_inc_range(llvm::reverse(BB))) {
+        MadeChange |= foldAnyOrAllBitsSet(I);
+        MadeChange |= foldGuardedFunnelShift(I, DT);
+        MadeChange |= tryToRecognizePopCount(I);
+        bool flag1=tryToRecognizeTableBasedCRC32(I);
+        bool flag2=tryToRecognizeCrc(I);
+        MadeChange |= flag1;
+        if(flag1)
+          errs() << "Function we have created seems to work properly!\n";
+        //else
+        //errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
+        if(flag2)
+          errs() << "CRC32 algorithm has been recognised!" << "\n";
+        
+        MadeChange |= tryToFPToSat(I, TTI);
+        MadeChange |= tryToRecognizeTableBasedCttz(I);
+        MadeChange |= foldConsecutiveLoads(I, DL, TTI, AA, DT);
+        MadeChange |= foldPatternedLoads(I, DL);
+        // NOTE: This function introduces erasing of the instruction `I`, so it
+        // needs to be called at the end of this sequence, otherwise we may make
+        // bugs.
+        MadeChange |= foldSqrt(I, TTI, TLI);
+      }
     }
   }
-
   // We're done with transforms, so remove dead instructions.
   if (MadeChange)
     for (BasicBlock &BB : F)
