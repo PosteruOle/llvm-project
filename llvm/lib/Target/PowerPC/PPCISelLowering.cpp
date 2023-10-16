@@ -464,13 +464,17 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
         (Subtarget.hasP9Vector() && Subtarget.isPPC64()) ? Custom : Expand);
   }
 
-  // CTPOP or CTTZ were introduced in P8/P9 respectively
+  // CTPOP or CTTZ (or CRC) were introduced in P8/P9 respectively
   if (Subtarget.isISA3_0()) {
     setOperationAction(ISD::CTTZ , MVT::i32  , Legal);
     setOperationAction(ISD::CTTZ , MVT::i64  , Legal);
+    setOperationAction(ISD::CRC , MVT::i32  , Legal);
+    setOperationAction(ISD::CRC , MVT::i64  , Legal);
   } else {
     setOperationAction(ISD::CTTZ , MVT::i32  , Expand);
     setOperationAction(ISD::CTTZ , MVT::i64  , Expand);
+    setOperationAction(ISD::CRC , MVT::i32  , Expand);
+    setOperationAction(ISD::CRC , MVT::i64  , Expand);
   }
 
   if (Subtarget.hasPOPCNTD() == PPCSubtarget::POPCNTD_Fast) {
@@ -801,10 +805,13 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
       }
 
       // Vector instructions introduced in P9
-      if (Subtarget.hasP9Altivec() && (VT.SimpleTy != MVT::v1i128))
+      if (Subtarget.hasP9Altivec() && (VT.SimpleTy != MVT::v1i128)){
         setOperationAction(ISD::CTTZ, VT, Legal);
-      else
+        setOperationAction(ISD::CRC, VT, Legal);
+      } else {
         setOperationAction(ISD::CTTZ, VT, Expand);
+        setOperationAction(ISD::CRC, VT, Expand);
+      }
 
       // We promote all shuffles to v16i8.
       setOperationAction(ISD::VECTOR_SHUFFLE, VT, Promote);

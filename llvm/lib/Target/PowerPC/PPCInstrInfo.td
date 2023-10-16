@@ -2320,6 +2320,10 @@ defm CNTTZW : XForm_11r<31, 538, (outs gprc:$RA), (ins gprc:$RST),
                         "cnttzw", "$RA, $RST", IIC_IntGeneral,
                         [(set i32:$RA, (cttz i32:$RST))]>, Requires<[IsISA3_0]>,
                         ZExt32To64;
+//defm CNRCW : XForm_11r<31, 548, (outs gprc:$RA), (ins gprc:$RST),
+//                        "cnrcw", "$RA, $RST", IIC_IntGeneral,
+//                        [(set i32:$RA, (crc i32:$RST))]>, Requires<[IsISA3_0]>,
+//                        ZExt32To64;                        
 defm EXTSB  : XForm_11r<31, 954, (outs gprc:$RA), (ins gprc:$RST),
                         "extsb", "$RA, $RST", IIC_IntSimple,
                         [(set i32:$RA, (sext_inreg i32:$RST, i8))]>, SExt32To64;

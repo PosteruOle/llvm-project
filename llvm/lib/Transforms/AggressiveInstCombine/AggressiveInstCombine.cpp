@@ -31,6 +31,17 @@
 #include "llvm/Transforms/Utils/BuildLibCalls.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include <cstring>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/IR/BasicBlock.h"
+#include <cassert>
+
+#include "llvm/Pass.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -537,98 +548,431 @@ static bool foldSqrt(Instruction &I, TargetTransformInfo &TTI,
 
 //---------------------------------------------------------------------------------------------------------------------------------------
 // Petar's code!
-
 //LLVM IR code for the naive crc algorithm implementation!
 /*
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @crc32a(i8* %0, i32 %1) #0 {
-  %3 = alloca i8*, align 8
-  %4 = alloca i32, align 4
-  %5 = alloca i32, align 4
-  %6 = alloca i32, align 4
-  %7 = alloca i32, align 4
-  %8 = alloca i32, align 4
-  store i8* %0, i8** %3, align 8
-  store i32 %1, i32* %4, align 4
-  store i32 0, i32* %5, align 4
-  store i32 -1, i32* %8, align 4
-  br label %9
+; Function Attrs: noinline nounwind uwtable
+define dso_local zeroext i16 @crcu8(i8 zeroext %0, i16 zeroext %1) #0 {
+  %3 = alloca i8, align 1
+  %4 = alloca i16, align 2
+  %5 = alloca i8, align 1
+  %6 = alloca i8, align 1
+  %7 = alloca i8, align 1
+  store i8 %0, i8* %3, align 1
+  store i16 %1, i16* %4, align 2
+  store i8 0, i8* %5, align 1
+  store i8 0, i8* %6, align 1
+  store i8 0, i8* %7, align 1
+  store i8 0, i8* %5, align 1
+  br label %8
 
-9:                                                ; preds = %43, %2
-  %10 = load i32, i32* %5, align 4
-  %11 = load i32, i32* %4, align 4
-  %12 = icmp ult i32 %10, %11
-  br i1 %12, label %13, label %46
+8:                                                ; preds = %53, %2
+  %9 = load i8, i8* %5, align 1
+  %10 = zext i8 %9 to i32
+  %11 = icmp slt i32 %10, 8
+  br i1 %11, label %12, label %56
 
-13:                                               ; preds = %9
-  %14 = load i8*, i8** %3, align 8
-  %15 = load i32, i32* %5, align 4
-  %16 = sext i32 %15 to i64
-  %17 = getelementptr inbounds i8, i8* %14, i64 %16
-  %18 = load i8, i8* %17, align 1
-  %19 = zext i8 %18 to i32
-  store i32 %19, i32* %7, align 4
-  %20 = load i32, i32* %7, align 4
-  %21 = call i32 @reverse(i32 %20)
-  store i32 %21, i32* %7, align 4
-  store i32 0, i32* %6, align 4
-  br label %22
+12:                                               ; preds = %8
+  %13 = load i8, i8* %3, align 1
+  %14 = zext i8 %13 to i32
+  %15 = and i32 %14, 1
+  %16 = load i16, i16* %4, align 2
+  %17 = trunc i16 %16 to i8
+  %18 = zext i8 %17 to i32
+  %19 = and i32 %18, 1
+  %20 = xor i32 %15, %19
+  %21 = trunc i32 %20 to i8
+  store i8 %21, i8* %6, align 1
+  %22 = load i8, i8* %3, align 1
+  %23 = zext i8 %22 to i32
+  %24 = ashr i32 %23, 1
+  %25 = trunc i32 %24 to i8
+  store i8 %25, i8* %3, align 1
+  %26 = load i8, i8* %6, align 1
+  %27 = zext i8 %26 to i32
+  %28 = icmp eq i32 %27, 1
+  br i1 %28, label %29, label %34
 
-22:                                               ; preds = %40, %13
-  %23 = load i32, i32* %6, align 4
-  %24 = icmp sle i32 %23, 7
-  br i1 %24, label %25, label %43
+29:                                               ; preds = %12
+  %30 = load i16, i16* %4, align 2
+  %31 = zext i16 %30 to i32
+  %32 = xor i32 %31, 16386
+  %33 = trunc i32 %32 to i16
+  store i16 %33, i16* %4, align 2
+  store i8 1, i8* %7, align 1
+  br label %35
 
-25:                                               ; preds = %22
-  %26 = load i32, i32* %8, align 4
-  %27 = load i32, i32* %7, align 4
-  %28 = xor i32 %26, %27
-  %29 = icmp slt i32 %28, 0
-  br i1 %29, label %30, label %34
+34:                                               ; preds = %12
+  store i8 0, i8* %7, align 1
+  br label %35
 
-30:                                               ; preds = %25
-  %31 = load i32, i32* %8, align 4
-  %32 = shl i32 %31, 1
-  %33 = xor i32 %32, 79764919
-  store i32 %33, i32* %8, align 4
-  br label %37
+35:                                               ; preds = %34, %29
+  %36 = load i16, i16* %4, align 2
+  %37 = zext i16 %36 to i32
+  %38 = ashr i32 %37, 1
+  %39 = trunc i32 %38 to i16
+  store i16 %39, i16* %4, align 2
+  %40 = load i8, i8* %7, align 1
+  %41 = icmp ne i8 %40, 0
+  br i1 %41, label %42, label %47
 
-34:                                               ; preds = %25
-  %35 = load i32, i32* %8, align 4
-  %36 = shl i32 %35, 1
-  store i32 %36, i32* %8, align 4
-  br label %37
+42:                                               ; preds = %35
+  %43 = load i16, i16* %4, align 2
+  %44 = zext i16 %43 to i32
+  %45 = or i32 %44, 32768
+  %46 = trunc i32 %45 to i16
+  store i16 %46, i16* %4, align 2
+  br label %52
 
-37:                                               ; preds = %34, %30
-  %38 = load i32, i32* %7, align 4
-  %39 = shl i32 %38, 1
-  store i32 %39, i32* %7, align 4
-  br label %40
+47:                                               ; preds = %35
+  %48 = load i16, i16* %4, align 2
+  %49 = zext i16 %48 to i32
+  %50 = and i32 %49, 32767
+  %51 = trunc i32 %50 to i16
+  store i16 %51, i16* %4, align 2
+  br label %52
 
-40:                                               ; preds = %37
-  %41 = load i32, i32* %6, align 4
-  %42 = add nsw i32 %41, 1
-  store i32 %42, i32* %6, align 4
-  br label %22
+52:                                               ; preds = %47, %42
+  br label %53
 
-43:                                               ; preds = %22
-  %44 = load i32, i32* %5, align 4
-  %45 = add nsw i32 %44, 1
-  store i32 %45, i32* %5, align 4
-  br label %9
+53:                                               ; preds = %52
+  %54 = load i8, i8* %5, align 1
+  %55 = add i8 %54, 1
+  store i8 %55, i8* %5, align 1
+  br label %8
 
-46:                                               ; preds = %9
-  %47 = load i32, i32* %8, align 4
-  %48 = xor i32 %47, -1
-  %49 = call i32 @reverse(i32 %48)
-  ret i32 %49
+56:                                               ; preds = %8
+  %57 = load i16, i16* %4, align 2
+  ret i16 %57
 }
 */
-static bool tryToRecognizeCrc(Instruction &I){
+static bool tryToRecognizeCRC32(Instruction &I){
+  ReturnInst *RI=dyn_cast<ReturnInst>(&I);
+  ReturnInst *RIfinal=dyn_cast<ReturnInst>(&I);
+  if(!RI || !RIfinal)
+    return false;
   
-  //To do!
+  LoadInst *LI=dyn_cast<LoadInst>(RI->getPrevNode());
+  LoadInst *LIfinal=dyn_cast<LoadInst>(RI->getPrevNode());
+  if(!LI || !LIfinal)
+    return false;
 
-  return false;
+  BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  Instruction *II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  Value *help1;
+  Value *help2;
+  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;  
+
+  BB=dyn_cast<BasicBlock>(BI->getParent()->getPrevNode());
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  // For some reason we could not see trunc instruction!
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(32767))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  // We should somehow recognize -32768 here!
+  if(!match(II, m_Or(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICmpInst *ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ICMPI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  TruncInst *TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_AShr(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZExtInst *ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(SI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;                              
+  
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!match(II, m_Xor(m_Value(help1), m_SpecificInt(16386))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(ICMPI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  //Just to check something!
+  //SI=dyn_cast<StoreInst>(ZI->getPrevNode()); <- as we already assumed it doesn't work!
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());    
+  if(!SI)
+    return false;
+
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());    
+  if(!TI)
+    return false;          
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_AShr(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;    
+  
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+    return false;
+
+  II=dyn_cast<Instruction>(II->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  TI=dyn_cast<TruncInst>(II->getPrevNode());
+  if(!TI)
+    return false;    
+
+  LI=dyn_cast<LoadInst>(TI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  II=dyn_cast<Instruction>(LI->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(ICMPI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+  
+  // Here we have to match 6 more consecutive store instructions and 5 consecutive alloca instructions!
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;       
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false; 
+
+  // Last thing we have to match are 5 alloca instructions!
+  AllocaInst *AI=dyn_cast<AllocaInst>(SI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;                        
+  
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;    
+
+  errs() << "Original unoptimized form of CRC32 algorithm has been recognized!\n";
+  Value *argument1=LIfinal->getFunction()->getArg(0);
+  Value *argument2=LIfinal->getFunction()->getArg(1);
+  //errs() << argument1->getType()->isIntOrIntVectorTy() << "\n";
+  //errs() << argument2->getType()->isIntOrIntVectorTy() << "\n";
+  Type* ArgType1=argument1->getType();
+  Type* ArgType2=argument2->getType();
+  //argument1->dump();
+  //argument2->dump();
+  //ArgType1->dump();
+  //ArgType2->dump();
+  
+  IRBuilder<> B(LIfinal);
+  //Function *function = Intrinsic::getDeclaration(LIfinal->getModule(), Intrinsic::crc8, {ArgType1, ArgType2});
+  auto CRC8 = B.CreateIntrinsic(Intrinsic::crc8, {}, {argument1, argument2});
+  // New insertion!
+
+  LIfinal->replaceAllUsesWith(CRC8);
+  BasicBlock *bb_help10=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help9=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help8=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help7=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help6=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help5=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help4=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help3=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help2=RIfinal->getParent()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help1=RIfinal->getParent()->getPrevNode();
+  DeleteDeadBlocks({bb_help1, bb_help2, bb_help3, bb_help4, bb_help5, bb_help6, bb_help7, bb_help8, bb_help9, bb_help10});
+  //Instruction *help=dyn_cast<Instruction>(&RIfinal->getParent()->back());
+  //Instruction *one_to_delete=dyn_cast<Instruction>(help->getPrevNode());
+  //one_to_delete->removeFromParent();
+  //RIfinal->getPrevNode()->eraseFromParent();
+
+  return true;
 }
 
 // Check if this array of constants represents a crc32 table.
@@ -692,42 +1036,28 @@ define internal i32 @singletable_crc32c(i32 %0, i8* %1, i64 %2) #0 {
 */
 static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   ReturnInst *RI=dyn_cast<ReturnInst>(&I);
+  ReturnInst *RIfinal=dyn_cast<ReturnInst>(&I);
   if(!RI)
     return false;
-
+  
   LoadInst *LI = dyn_cast<LoadInst>(RI->getPrevNode());
   if (!LI)
     return false;
   
-  //return true;
-  //errs() << "Why here, sir?!" << "\n";
-  //errs() << "Why here, sir2?!" << "\n";
-  //errs() << "Why here, sir3?!" << "\n";
+  LoadInst *LIfinal=dyn_cast<LoadInst>(LI);
+  Type *AccessType = LI->getType(); 
+  if (!AccessType->isIntegerTy())
+    return false; 
+  
   BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
   
-  /*
-  Instruction* III=dyn_cast<Instruction>(&BB->back());
-  //errs() << "Why here, miss?!" << "\n";
-  if(!III){
-    errs() << "Why here?!" << "\n";
-    return false;
-  } 
-  */ 
-  
   BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
-  //errs() << "Why here, miss?!" << "\n";
   if(!BI)
     return false;
-  
 
-  //StoreInst *SI=dyn_cast<StoreInst>(III->getPrevNode());
   StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
   if(!SI)
     return false;
-
-  
-  //------------------------------------------------------------------------------------------------------------------------------------------------- 
-  //return true;
 
   Instruction *II=dyn_cast<Instruction>(SI->getPrevNode());
   Value *help1;
@@ -747,7 +1077,25 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   LI=dyn_cast<LoadInst>(LI->getPrevNode());
   if(!LI)
     return false;
+  
+  // Temporary insertion!!!!!!!!!!!!!
+  GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(LI->getPointerOperand());
+  if (!GEP || !GEP->isInBounds() || GEP->getNumIndices() != 2)
+    return false;
 
+  GlobalVariable *GVTable = dyn_cast<GlobalVariable>(GEP->getPointerOperand());
+  if (!GVTable || !GVTable->hasInitializer() || !GVTable->isConstant())
+    return false;
+
+  ConstantDataArray *ConstData=dyn_cast<ConstantDataArray>(GVTable->getInitializer());
+  if (!ConstData)
+    return false;
+  
+  if (!isCRC32Table(*ConstData))
+    return false;
+  // End of temporary insertion!!!!!!!!!!!!! 
+   
+  
   GetElementPtrInst *GEPI=dyn_cast<GetElementPtrInst>(LI->getPrevNode());
   if(!GEPI)
     return false;
@@ -760,13 +1108,15 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   if(!match(II, m_And(m_Value(help1), m_Value(help2))))
     return false;
   
+  Value *X1;
+
   II=dyn_cast<Instruction>(II->getPrevNode());
-  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+  if(!match(II, m_Xor(m_Value(X1), m_Value(help2))))
     return false;
 
   LI=dyn_cast<LoadInst>(II->getPrevNode());
   if(!LI)
-    return false;
+    return false;  
 
   SI=dyn_cast<StoreInst>(LI->getPrevNode());
   if(!SI)
@@ -780,13 +1130,10 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   if(!LI)
     return false;
 
+  
   LI=dyn_cast<LoadInst>(LI->getPrevNode());
   if(!LI)
     return false;
-  
-  
-  //------------------------------------------------------------------------------------------------------------------------------------------------- 
-  //return true;
 
   BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
 
@@ -803,15 +1150,12 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
     return false;
 
   II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+  if(!match(II, m_Add(m_Value(help1), m_SpecificInt(-1))))
     return false;
 
   LI=dyn_cast<LoadInst>(II->getPrevNode());
   if(!LI)
     return false;
-  
-  //------------------------------------------------------------------------------------------------------------------------------------------------- 
-  //return true;
 
   BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
 
@@ -863,521 +1207,53 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   errs() << "!!!Table-based CRC32 algorithm is finally recognized!!!" << "\n";
   errs() << "It will be nice if we can check the value of the operands in this algorithm implementation!" << "\n";
 
+  //We land this from tryToRecognizeTableBasedCTTZ function!
+  auto ZeroTableElem = ConstData->getElementAsInteger(0);
+  unsigned InputBits = X1->getType()->getScalarSizeInBits();
+  bool DefinedForZero = ZeroTableElem == InputBits;
+  
+  IRBuilder<> B(LIfinal);
+  ConstantInt *BoolConst = B.getInt1(!DefinedForZero);
+  Type *XType = X1->getType();
+  Value *final_arg=LIfinal->getFunction()->getArg(0);
+  auto CRC = B.CreateIntrinsic(Intrinsic::crc, {XType}, {final_arg, BoolConst});
+  Value *ZExtOrTrunc = nullptr;
+  //New insertion for crc32 intrinsic!
+  Value *argument1=LIfinal->getFunction()->getArg(0);
+  Value *argument2=LIfinal->getFunction()->getArg(1);
+  Value *argument3=LIfinal->getFunction()->getArg(2);
+  //auto CRC32 = B.CreateIntrinsic(Intrinsic::crc32, {XType}, {argument1, argument2, argument3});
+  //End of new insertion!
+  
+  errs() << final_arg->getType()->isIntOrIntVectorTy() << "\n";
+  errs() << XType->isIntOrIntVectorTy() << "\n";
+  errs()<< CRC->getType()->isIntOrIntVectorTy() << "\n";
+  errs() << AccessType->isIntOrIntVectorTy() << "\n";
+
+  RIfinal->dump();
+  LIfinal->dump();
+  X1->dump();
+
+  LIfinal->replaceAllUsesWith(CRC);
+  //LIfinal->replaceAllUsesWith(CRC32);
+
+  BasicBlock *bb_help1=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help2=RIfinal->getParent()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help3=RIfinal->getParent()->getPrevNode();
+  DeleteDeadBlocks({bb_help3, bb_help2, bb_help1});
+  errs() << "We did it?!" << "\n";
+
+  Function *f=dyn_cast<Function>(LIfinal->getParent()->getParent());
+  Module *m=f->getParent();
+  auto call_function=m->getFunction("llvm.crc.i32");
+  if(call_function!=NULL){
+    errs() << "Wow!" << "\n";
+  } else {
+    errs() << "Failed!" << "\n";
+  }
+
   return true;
 }
-static bool tryToRecognizeTableBasedCRC32BruteForce(Function &F){
-    //Brute force pattern matching!
-    int step=1;
-
-    for(BasicBlock& BB: F){
-      if(step==1){
-        //auto it=BB.getInstList().begin();
-        int count=1;
-        for(Instruction& I: BB){
-          if(count<=4 ){
-            AllocaInst *II= dyn_cast<AllocaInst>(&I);
-            if(!II)
-              return false;
-          }  
-          
-          if(count>=5 && count<=7){
-            StoreInst* II=dyn_cast<StoreInst>(&I);
-            if(!II)
-              return false;
-          }  
-
-          if(count==8){
-            LoadInst* II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }  
-
-          if(count==9){
-            BitCastInst *II=dyn_cast<BitCastInst>(&I);
-            if(!II)
-              return false;
-          }
-
-          if(count==10){
-            StoreInst *II=dyn_cast<StoreInst>(&I);
-            if(!II)
-              return false;
-          }
-
-          if(count==11){
-            BranchInst *II=dyn_cast<BranchInst>(&I);
-            if(!II)
-              return false;
-          }
-          count++;  
-        }
-      } else if(step==2){
-        /*
-        if(BB.getName() != "while.cond")
-          return false;
-        */  
-        int count=1;
-        for(Instruction& I: BB){
-          Value *help1;
-          Value *help2;
-          if(count==1){
-            LoadInst *II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==2 && !match(help1, m_Add(m_Value(help2), m_SpecificInt(-1))))
-            return false;
-           
-          if(count==3){
-            StoreInst *II=dyn_cast<StoreInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==4){
-            ICmpInst *II=dyn_cast<ICmpInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==5){
-            BranchInst *II=dyn_cast<BranchInst>(&I);
-            if(!II)
-              return false;
-          }   
-
-          count++;   
-        }
-      } else if(step==3){
-        int count=1;
-        /*
-        if(BB.getName() != "while.body")
-          return false;
-        */
-        
-        for(Instruction& I: BB){
-          Value *help1;
-          Value *help2;
-          Value *help3;
-           
-          if(count<=2){
-            LoadInst *II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==3){
-            GetElementPtrInst *II=dyn_cast<GetElementPtrInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==4){
-            StoreInst *II=dyn_cast<StoreInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==5){
-            LoadInst *II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==6 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
-            return false;
-           
-          if(count==7 && !match(help1, m_And(m_Value(help2), m_Value(help3))))
-            return false;
-           
-          if(count==8){
-            ZExtInst *II=dyn_cast<ZExtInst>(&I);
-            if(!II)
-              return false;
-          }         
-           
-          if(count==9){
-            GetElementPtrInst *II=dyn_cast<GetElementPtrInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count>=10 && count<=11){
-            LoadInst *II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==12 && !match(help1, m_LShr(m_Value(help2), m_Value(help3))))
-            return false;
-           
-          if(count==13 && !match(help1, m_Xor(m_Value(help2), m_Value(help3))))
-            return false;
-           
-          if(count==14){
-            StoreInst *II=dyn_cast<StoreInst>(&I);
-            if(!II)
-              return false;
-          }
-           
-          if(count==15){
-            BranchInst *II=dyn_cast<BranchInst>(&I);
-            if(!II)
-              return false;
-          }           
-           
-          count++;   
-        }
-      } else {
-        int count=1;
-        
-        for(Instruction& I: BB){
-          if(count==1){
-            LoadInst *II=dyn_cast<LoadInst>(&I);
-            if(!II)
-              return false;
-          }
-          
-          if(count==2){
-            ReturnInst *II=dyn_cast<ReturnInst>(&I);
-            if(!II)
-              return false;
-          }
-          count++;
-        }
-      }
-      step++;
-    }
-    
-    errs() << "Table-based crc32 algortihm is recognized using brute force algorithm!" << "\n";
-
-    return true;
-}
-
-static bool tryToRecognizeCRC32(Instruction &I){
-  ReturnInst *RI=dyn_cast<ReturnInst>(&I);
-  if(!RI)
-    return false;
-
-  CallInst *CI=dyn_cast<CallInst>(RI->getPrevNode());
-  if(!CI)
-    return false;
-
-  Instruction *II=dyn_cast<Instruction>(CI->getPrevNode());
-  if(!II)
-    return false;
-  
-  Value *help1;
-  Value *help2;
-  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
-    return false;
-
-  LoadInst *LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;
-  
-    
-  BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-
-  II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)       
-    return false;
-
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-
-  II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;
-
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;      
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-  
-  II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;    
-  
-  //----------------------------------------------------------------------------------------------------------------------
-  //107. if.else:
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;      
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-  
-  II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;
-
-  //----------------------------------------------------------------------------------------------------------------------
-  //100. if.then:
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;      
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-  
-  II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Xor(m_Value(help1), m_SpecificInt(79764919))))
-    return false;
-
-  II=dyn_cast<Instruction>(II->getPrevNode());
-  if(!II)
-    return false;  
-  
-  if(!match(II, m_Shl(m_Value(help1), m_SpecificInt(1))))
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;
-  
-  //----------------------------------------------------------------------------------------------------------------------
-  //93. for.body:
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  ICmpInst *ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
-  if(!ICI)
-    return false;
-
-  II=dyn_cast<Instruction>(ICI->getPrevNode());
-  if(!II)
-    return false;
-
-  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))));
-    return false;
-
-  LI=dyn_cast<LoadInst>(II->getPrevNode());
-  if(!LI)
-    return false;
-  
-  LI=dyn_cast<LoadInst>(LI->getPrevNode());
-  if(!LI)
-    return false;
-
-  //----------------------------------------------------------------------------------------------------------------------
-  //88. for.cond:  
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-  
-  BI=dyn_cast<BranchInst>(&BB->back());  
-  if(!BI)
-    return false;
-
-  ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
-  if(!ICI)
-    return false;
-
-  LI=dyn_cast<LoadInst>(ICI->getPrevNode());
-  if(!LI)
-    return false;
-
-  //----------------------------------------------------------------------------------------------------------------------
-  //74. while.body:
-
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-  
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(SI->getPrevNode());
-  if(!SI)
-    return false;
-
-  CI=dyn_cast<CallInst>(SI->getPrevNode());
-  if(!CI)
-    return false;
-
-  LI=dyn_cast<LoadInst>(CI->getPrevNode());
-  if(!LI)
-    return false;
-  
-  SI=dyn_cast<StoreInst>(LI->getPrevNode());
-  if(!SI)
-    return false;
-
-  ZExtInst *ZI=dyn_cast<ZExtInst>(SI->getPrevNode());
-  if(!ZI)
-    return false;
-
-  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
-  if(!LI)
-    return false;
-
-  GetElementPtrInst *GEPI=dyn_cast<GetElementPtrInst>(LI->getPrevNode());
-  if(!GEPI)
-    return false; 
-
-  SExtInst *SEI=dyn_cast<SExtInst>(GEPI->getPrevNode());
-  if(!SEI)
-    return false;
-
-  LI=dyn_cast<LoadInst>(SEI->getPrevNode());
-  if(!LI)
-    return false;
-  
-  LI=dyn_cast<LoadInst>(LI->getPrevNode());
-  if(!LI)
-    return false;
-
-  //----------------------------------------------------------------------------------------------------------------------
-  //68. while.cond:
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-  
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  ICI=dyn_cast<ICmpInst>(BI->getPrevNode());
-  if(!ICI)
-    return false;
-  
-  LI=dyn_cast<LoadInst>(ICI->getPrevNode());
-  if(!LI)
-    return false;
-
-  LI=dyn_cast<LoadInst>(LI->getPrevNode());
-  if(!LI)
-    return false;        
-  
-  //----------------------------------------------------------------------------------------------------------------------
-  //55. entry:
-  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
-  if(!BB)
-    return false;
-  
-  BI=dyn_cast<BranchInst>(&BB->back());
-  if(!BI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(BI->getPrevNode());
-  if(!SI)
-    return false;  
-
-  SI=dyn_cast<StoreInst>(SI->getPrevNode());
-  if(!SI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(SI->getPrevNode());
-  if(!SI)
-    return false;
-
-  SI=dyn_cast<StoreInst>(SI->getPrevNode());
-  if(!SI)
-    return false;
-
-  AllocaInst *AI=dyn_cast<AllocaInst>(SI->getPrevNode());
-  if(!AI)
-    return false;
-
-  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
-  if(!AI)
-    return false;
-
-  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
-  if(!AI)
-    return false;
-
-  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
-  if(!AI)
-    return false;
-
-  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
-  if(!AI)
-    return false;
-
-  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
-  if(!AI)
-    return false;        
-
-  return true;              
-}
-//---------------------------------------------------------------------------------------------------------------------------------------
 
 // Check if this array of constants represents a cttz table.
 // Iterate over the elements from \p Table by trying to find/match all
@@ -1519,6 +1395,10 @@ static bool tryToRecognizeTableBasedCttz(Instruction &I) {
   ConstantInt *BoolConst = B.getInt1(!DefinedForZero);
   Type *XType = X1->getType();
   auto Cttz = B.CreateIntrinsic(Intrinsic::cttz, {XType}, {X1, BoolConst});
+  
+  errs() << "Table-based cttz algorithm is recognized!" << "\n";
+  errs()<< Cttz->getType()->isIntOrIntVectorTy() << "\n";
+
   Value *ZExtOrTrunc = nullptr;
 
   if (DefinedForZero) {
@@ -1859,10 +1739,6 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
                                 TargetLibraryInfo &TLI, AliasAnalysis &AA) {
   bool MadeChange = false;
   
-  //bool globalflag=tryToRecognizeTableBasedCRC32BruteForce(F);
-  //if(globalflag)
-  //  errs() << "I am supprised!" << "\n";
-  
   if(F.getName().str()=="reverse"){
     errs() << "We won't check this function!" << "\n";
     return false;
@@ -1888,17 +1764,24 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
         MadeChange |= foldGuardedFunnelShift(I, DT);
         MadeChange |= tryToRecognizePopCount(I);
         bool flag1=tryToRecognizeTableBasedCRC32(I);
-        bool flag2=tryToRecognizeCrc(I);
+        bool flag2=tryToRecognizeCRC32(I);
+        //bool flag2=false;
         MadeChange |= flag1;
         if(flag1)
           errs() << "Function we have created seems to work properly!\n";
-        //else
-        //errs() << "Table-based crc32 algorithm wasn't recognized!\n";  
+
         if(flag2)
           errs() << "CRC32 algorithm has been recognised!" << "\n";
-        
         MadeChange |= tryToFPToSat(I, TTI);
-        MadeChange |= tryToRecognizeTableBasedCttz(I);
+        //MadeChange |= tryToRecognizeTableBasedCttz(I);
+        bool recognised=tryToRecognizeTableBasedCttz(I);
+        if(recognised){
+          MadeChange |=recognised;
+          //errs() << "Mission completed!" << "\n";
+        } else {
+          MadeChange |=recognised;
+          //errs() << "Mission is still not completed!" << "\n";
+        }
         MadeChange |= foldConsecutiveLoads(I, DL, TTI, AA, DT);
         MadeChange |= foldPatternedLoads(I, DL);
         // NOTE: This function introduces erasing of the instruction `I`, so it
@@ -1943,5 +1826,6 @@ PreservedAnalyses AggressiveInstCombinePass::run(Function &F,
   // Mark all the analyses that instcombine updates as preserved.
   PreservedAnalyses PA;
   PA.preserveSet<CFGAnalyses>();
-  return PA;
+  return PreservedAnalyses::none();
+  //return PA;
 }

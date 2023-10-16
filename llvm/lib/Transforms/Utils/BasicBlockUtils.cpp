@@ -99,7 +99,9 @@ void llvm::DeleteDeadBlock(BasicBlock *BB, DomTreeUpdater *DTU,
 }
 
 void llvm::DeleteDeadBlocks(ArrayRef <BasicBlock *> BBs, DomTreeUpdater *DTU,
+
                             bool KeepOneInputPHIs) {
+
 #ifndef NDEBUG
   // Make sure that all predecessors of each dead block is also dead.
   SmallPtrSet<BasicBlock *, 4> Dead(BBs.begin(), BBs.end());
