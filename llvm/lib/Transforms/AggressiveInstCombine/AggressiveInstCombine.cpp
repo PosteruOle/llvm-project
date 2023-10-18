@@ -941,17 +941,10 @@ static bool tryToRecognizeCRC32(Instruction &I){
   errs() << "Original unoptimized form of CRC32 algorithm has been recognized!\n";
   Value *argument1=LIfinal->getFunction()->getArg(0);
   Value *argument2=LIfinal->getFunction()->getArg(1);
-  //errs() << argument1->getType()->isIntOrIntVectorTy() << "\n";
-  //errs() << argument2->getType()->isIntOrIntVectorTy() << "\n";
   Type* ArgType1=argument1->getType();
   Type* ArgType2=argument2->getType();
-  //argument1->dump();
-  //argument2->dump();
-  //ArgType1->dump();
-  //ArgType2->dump();
   
   IRBuilder<> B(LIfinal);
-  //Function *function = Intrinsic::getDeclaration(LIfinal->getModule(), Intrinsic::crc8, {ArgType1, ArgType2});
   auto CRC8 = B.CreateIntrinsic(Intrinsic::crc8, {}, {argument1, argument2});
   // New insertion!
 
@@ -967,10 +960,6 @@ static bool tryToRecognizeCRC32(Instruction &I){
   BasicBlock *bb_help2=RIfinal->getParent()->getPrevNode()->getPrevNode();
   BasicBlock *bb_help1=RIfinal->getParent()->getPrevNode();
   DeleteDeadBlocks({bb_help1, bb_help2, bb_help3, bb_help4, bb_help5, bb_help6, bb_help7, bb_help8, bb_help9, bb_help10});
-  //Instruction *help=dyn_cast<Instruction>(&RIfinal->getParent()->back());
-  //Instruction *one_to_delete=dyn_cast<Instruction>(help->getPrevNode());
-  //one_to_delete->removeFromParent();
-  //RIfinal->getPrevNode()->eraseFromParent();
 
   return true;
 }
@@ -1230,9 +1219,9 @@ static bool tryToRecognizeTableBasedCRC32(Instruction &I){
   errs()<< CRC->getType()->isIntOrIntVectorTy() << "\n";
   errs() << AccessType->isIntOrIntVectorTy() << "\n";
 
-  RIfinal->dump();
-  LIfinal->dump();
-  X1->dump();
+  //RIfinal->dump();
+  //LIfinal->dump();
+  //X1->dump();
 
   LIfinal->replaceAllUsesWith(CRC);
   //LIfinal->replaceAllUsesWith(CRC32);
