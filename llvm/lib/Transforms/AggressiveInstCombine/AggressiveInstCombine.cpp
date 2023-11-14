@@ -946,6 +946,7 @@ static bool tryToRecognizeCRC32(Instruction &I){
   IRBuilder<> B(LIfinal);
   
   //Something to remember because it's very important!
+  //Here is hidden a another aproach for replacing unoptimized crc with optimized version!
   //auto CRC8 = B.CreateIntrinsic(Intrinsic::crc8, {}, {argument1, argument2});
   //LIfinal->replaceAllUsesWith(CRC8);
   //LIfinal->removeFromParent();

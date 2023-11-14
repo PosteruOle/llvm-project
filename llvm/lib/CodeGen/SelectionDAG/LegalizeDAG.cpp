@@ -983,6 +983,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
 
   // Figure out the correct action; the way to query this varies by opcode
   TargetLowering::LegalizeAction Action = TargetLowering::Legal;
+  //TargetLowering::LegalizeAction Action = TargetLowering::Custom;
   bool SimpleFinishLegalizing = true;
   switch (Node->getOpcode()) {
   case ISD::INTRINSIC_W_CHAIN:
@@ -1039,6 +1040,9 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     Action = TLI.getOperationAction(Node->getOpcode(),
                                     Node->getOperand(2).getValueType());
     break;
+  case ISD::ADD:
+    Action=TargetLowering::Custom;
+    break;  
   case ISD::SELECT_CC:
   case ISD::STRICT_FSETCC:
   case ISD::STRICT_FSETCCS:

@@ -30147,11 +30147,25 @@ static SDValue LowerCTTZ(SDValue Op, const X86Subtarget &Subtarget,
   return DAG.getNode(X86ISD::CMOV, dl, VT, Ops);
 }
 
+static SDValue LowerMUL(SDValue Op, const X86Subtarget &Subtarget, SelectionDAG &DAG);
+
 static SDValue lowerAddSub(SDValue Op, SelectionDAG &DAG,
                            const X86Subtarget &Subtarget) {
   MVT VT = Op.getSimpleValueType();
+  SDValue X=Op.getOperand(0);
+  SDValue Y=Op.getOperand(1);
+  
+  if(X==Y){
+    SDValue return_new=DAG.getNode(ISD::MUL, SDLoc(Op.getNode()), DAG.getVTList(Op.getValueType()),
+                      DAG.getNode(ISD::ANY_EXTEND, SDLoc(Op.getNode()), DAG.getVTList(Op.getValueType()), X),
+                      DAG.getNode(ISD::ANY_EXTEND, SDLoc(Op.getNode()), DAG.getVTList(Op.getValueType()), DAG.getConstant(2, SDLoc(Op.getNode()), Op.getValueType())));
+
+    return return_new;
+  }
+  
   if (VT == MVT::i16 || VT == MVT::i32)
     return lowerAddSubToHorizontalOp(Op, DAG, Subtarget);
+
 
   if (VT == MVT::v32i16 || VT == MVT::v64i8)
     return splitVectorIntBinary(Op, DAG);
@@ -34083,6 +34097,7 @@ bool X86TargetLowering::isInlineAsmTargetBranch(
 
 /// Provide custom lowering hooks for some operations.
 SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
+  errs() << Op.getOpcode() << "\n";
   switch (Op.getOpcode()) {
   default: llvm_unreachable("Should not custom lower this!");
   case ISD::ATOMIC_FENCE:       return LowerATOMIC_FENCE(Op, Subtarget, DAG);
