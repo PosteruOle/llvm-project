@@ -30162,10 +30162,9 @@ static SDValue lowerAddSub(SDValue Op, SelectionDAG &DAG,
 
     return return_new;
   }
-  
+
   if (VT == MVT::i16 || VT == MVT::i32)
     return lowerAddSubToHorizontalOp(Op, DAG, Subtarget);
-
 
   if (VT == MVT::v32i16 || VT == MVT::v64i8)
     return splitVectorIntBinary(Op, DAG);
