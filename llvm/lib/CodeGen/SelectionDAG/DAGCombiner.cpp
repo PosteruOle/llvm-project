@@ -468,6 +468,8 @@ namespace {
     SDValue visitCTLZ_ZERO_UNDEF(SDNode *N);
     SDValue visitCTTZ(SDNode *N);
     SDValue visitCTTZ_ZERO_UNDEF(SDNode *N);
+    //SDValue visitCRC(SDNode *N);
+    //SDValue visitCRC_ZERO_UNDEF(SDNode *N);
     SDValue visitCTPOP(SDNode *N);
     SDValue visitSELECT(SDNode *N);
     SDValue visitVSELECT(SDNode *N);
@@ -1938,6 +1940,8 @@ SDValue DAGCombiner::visit(SDNode *N) {
   case ISD::CTLZ_ZERO_UNDEF:    return visitCTLZ_ZERO_UNDEF(N);
   case ISD::CTTZ:               return visitCTTZ(N);
   case ISD::CTTZ_ZERO_UNDEF:    return visitCTTZ_ZERO_UNDEF(N);
+  //case ISD::CRC:                return visitCTTZ(N); //return visitCRC(N);
+  //case ISD::CRC_ZERO_UNDEF:     return visitCTTZ_ZERO_UNDEF(N); //return visitCRC_ZERO_UNDEF(N);
   case ISD::CTPOP:              return visitCTPOP(N);
   case ISD::SELECT:             return visitSELECT(N);
   case ISD::VSELECT:            return visitVSELECT(N);
@@ -10910,7 +10914,24 @@ SDValue DAGCombiner::visitCTTZ(SDNode *N) {
 
   return SDValue();
 }
+/*
+SDValue DAGCombiner::visitCRC(SDNode *N) {
+  SDValue N0 = N->getOperand(0);
+  EVT VT = N->getValueType(0);
 
+  // fold (cttz c1) -> c2
+  if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
+    return DAG.getNode(ISD::CTTZ, SDLoc(N), VT, N0);
+
+  // If the value is known never to be zero, switch to the undef version.
+  if (!LegalOperations || TLI.isOperationLegal(ISD::CTTZ_ZERO_UNDEF, VT)) {
+    if (DAG.isKnownNeverZero(N0))
+      return DAG.getNode(ISD::CTTZ_ZERO_UNDEF, SDLoc(N), VT, N0);
+  }
+
+  return SDValue();
+}
+*/
 SDValue DAGCombiner::visitCTTZ_ZERO_UNDEF(SDNode *N) {
   SDValue N0 = N->getOperand(0);
   EVT VT = N->getValueType(0);
@@ -10920,7 +10941,17 @@ SDValue DAGCombiner::visitCTTZ_ZERO_UNDEF(SDNode *N) {
     return DAG.getNode(ISD::CTTZ_ZERO_UNDEF, SDLoc(N), VT, N0);
   return SDValue();
 }
+/*
+SDValue DAGCombiner::visitCRC_ZERO_UNDEF(SDNode *N) {
+  SDValue N0 = N->getOperand(0);
+  EVT VT = N->getValueType(0);
 
+  // fold (cttz_zero_undef c1) -> c2
+  if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
+    return DAG.getNode(ISD::CTTZ_ZERO_UNDEF, SDLoc(N), VT, N0);
+  return SDValue();
+}
+*/
 SDValue DAGCombiner::visitCTPOP(SDNode *N) {
   SDValue N0 = N->getOperand(0);
   EVT VT = N->getValueType(0);

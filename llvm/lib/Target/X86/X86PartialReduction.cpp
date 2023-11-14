@@ -103,6 +103,7 @@ static bool matchVPDPBUSDPattern(const X86Subtarget *ST, BinaryOperator *Mul,
 
 bool X86PartialReduction::tryMAddReplacement(Instruction *Op,
                                              bool ReduceInOneBB) {
+  errs() << "Hi there! Petar sends his regards!\n";
   if (!ST->hasSSE2())
     return false;
 
@@ -498,6 +499,7 @@ static void collectLeaves(Value *Root, SmallVectorImpl<Instruction *> &Leaves) {
 }
 
 bool X86PartialReduction::runOnFunction(Function &F) {
+  errs() << "Syrmia?!\n";
   if (skipFunction(F))
     return false;
 

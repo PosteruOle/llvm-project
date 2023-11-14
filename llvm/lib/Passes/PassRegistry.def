@@ -270,6 +270,7 @@ FUNCTION_ALIAS_ANALYSIS("tbaa", TypeBasedAA())
 // Petar's code!
 FUNCTION_PASS("petarhelloworld", PetarHelloWorldPass())
 FUNCTION_PASS("petarcountcttz", PetarCountCttzPass())
+FUNCTION_PASS("expression-optimizer", ExpressionOptimizerPass())
 //---------------------------------------------
 FUNCTION_PASS("aa-eval", AAEvaluator())
 FUNCTION_PASS("adce", ADCEPass())

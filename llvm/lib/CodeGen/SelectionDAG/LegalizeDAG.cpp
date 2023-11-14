@@ -983,6 +983,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
 
   // Figure out the correct action; the way to query this varies by opcode
   TargetLowering::LegalizeAction Action = TargetLowering::Legal;
+  //TargetLowering::LegalizeAction Action = TargetLowering::Custom;
   bool SimpleFinishLegalizing = true;
   switch (Node->getOpcode()) {
   case ISD::INTRINSIC_W_CHAIN:
@@ -1039,6 +1040,9 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     Action = TLI.getOperationAction(Node->getOpcode(),
                                     Node->getOperand(2).getValueType());
     break;
+  case ISD::ADD:
+    Action=TargetLowering::Custom;
+    break;  
   case ISD::SELECT_CC:
   case ISD::STRICT_FSETCC:
   case ISD::STRICT_FSETCCS:
@@ -2833,6 +2837,12 @@ bool SelectionDAGLegalize::ExpandNode(SDNode *Node) {
     if ((Tmp1 = TLI.expandCTTZ(Node, DAG)))
       Results.push_back(Tmp1);
     break;
+  case ISD::CRC32:
+  case ISD::CRC:
+  case ISD::CRC_ZERO_UNDEF:
+    if ((Tmp1 = TLI.expandCRC(Node, DAG)))
+      Results.push_back(Tmp1);
+    break;  
   case ISD::BITREVERSE:
     if ((Tmp1 = TLI.expandBITREVERSE(Node, DAG)))
       Results.push_back(Tmp1);
@@ -4668,17 +4678,19 @@ void SelectionDAGLegalize::PromoteNode(SDNode *Node) {
   switch (Node->getOpcode()) {
   case ISD::CTTZ:
   case ISD::CTTZ_ZERO_UNDEF:
+  //case ISD::CRC:
+  //case ISD::CRC_ZERO_UNDEF:
   case ISD::CTLZ:
   case ISD::CTLZ_ZERO_UNDEF:
   case ISD::CTPOP:
     // Zero extend the argument unless its cttz, then use any_extend.
-    if (Node->getOpcode() == ISD::CTTZ ||
+    if (Node->getOpcode() == ISD::CRC || Node->getOpcode() == ISD::CRC_ZERO_UNDEF || Node->getOpcode() == ISD::CTTZ ||
         Node->getOpcode() == ISD::CTTZ_ZERO_UNDEF)
       Tmp1 = DAG.getNode(ISD::ANY_EXTEND, dl, NVT, Node->getOperand(0));
     else
       Tmp1 = DAG.getNode(ISD::ZERO_EXTEND, dl, NVT, Node->getOperand(0));
 
-    if (Node->getOpcode() == ISD::CTTZ) {
+    if (Node->getOpcode() == ISD::CRC || Node->getOpcode() == ISD::CTTZ) {
       // The count is the same in the promoted type except if the original
       // value was zero.  This can be handled by setting the bit just off
       // the top of the original type.

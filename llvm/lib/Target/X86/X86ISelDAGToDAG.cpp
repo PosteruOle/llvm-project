@@ -4780,7 +4780,7 @@ bool X86DAGToDAGISel::tryMatchBitSelect(SDNode *N) {
 
 void X86DAGToDAGISel::Select(SDNode *Node) {
   MVT NVT = Node->getSimpleValueType(0);
-  unsigned Opcode = Node->getOpcode();
+  unsigned Opcode = Node->getOpcode();;
   SDLoc dl(Node);
 
   if (Node->isMachineOpcode()) {
@@ -4788,6 +4788,7 @@ void X86DAGToDAGISel::Select(SDNode *Node) {
     Node->setNodeId(-1);
     return;   // Already selected.
   }
+
 
   switch (Opcode) {
   default: break;
@@ -5156,7 +5157,7 @@ void X86DAGToDAGISel::Select(SDNode *Node) {
         return;
       }
     }
-
+    
     CurDAG->SelectNodeTo(Node, ROpc, NVT, MVT::i32, N0, N1);
     return;
   }

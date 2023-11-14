@@ -3481,6 +3481,18 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     Known.Zero.setBitsFrom(LowBits);
     break;
   }
+  /*
+  case ISD::CRC:
+  case ISD::CRC_ZERO_UNDEF: {
+    Known2 = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
+    // If we have a known 1, its position is our upper bound.
+    unsigned PossibleTZ = Known2.countMaxTrailingZeros();
+    unsigned LowBits = llvm::bit_width(PossibleTZ);
+    Known.Zero.setBitsFrom(LowBits);
+    //Known.
+    break;
+  }
+  */
   case ISD::CTLZ:
   case ISD::CTLZ_ZERO_UNDEF: {
     Known2 = computeKnownBits(Op.getOperand(0), DemandedElts, Depth + 1);
@@ -5404,6 +5416,11 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     case ISD::CTTZ_ZERO_UNDEF:
       return getConstant(Val.countr_zero(), DL, VT, C->isTargetOpcode(),
                          C->isOpaque());
+    case ISD::CRC32:
+    case ISD::CRC:
+    case ISD::CRC_ZERO_UNDEF:
+      return getConstant(Val.countr_zero(), DL, VT, C->isTargetOpcode(),
+                         C->isOpaque());                     
     case ISD::FP16_TO_FP:
     case ISD::BF16_TO_FP: {
       bool Ignored;
@@ -5522,6 +5539,9 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
   case ISD::CTLZ_ZERO_UNDEF:
   case ISD::CTTZ:
   case ISD::CTTZ_ZERO_UNDEF:
+  case ISD::CRC32:
+  case ISD::CRC:
+  case ISD::CRC_ZERO_UNDEF:
   case ISD::CTPOP: {
     SDValue Ops = {Operand};
     if (SDValue Fold = FoldConstantArithmetic(Opcode, DL, VT, Ops))
@@ -5756,6 +5776,7 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
       return Operand;
     break;
   case ISD::CTLZ:
+  //case ISD::CRC:
   case ISD::CTTZ:
     if (Operand.getValueType().getScalarType() == MVT::i1)
       return getNOT(DL, Operand, Operand.getValueType());

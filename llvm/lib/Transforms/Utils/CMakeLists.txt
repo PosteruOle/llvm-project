@@ -85,6 +85,7 @@ add_llvm_component_library(LLVMTransformUtils
   VNCoercion.cpp
   PetarHelloWorld.cpp
   PetarCountCttz.cpp
+  ExpressionOptimizer.cpp
   
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms

@@ -1527,6 +1527,8 @@ bool llvm::canConstantFoldCallTo(const CallBase *Call, const Function *F) {
   case Intrinsic::ctpop:
   case Intrinsic::ctlz:
   case Intrinsic::cttz:
+  case Intrinsic::crc:
+  case Intrinsic::crc32:
   case Intrinsic::fshl:
   case Intrinsic::fshr:
   case Intrinsic::launder_invariant_group:
@@ -2828,6 +2830,7 @@ static Constant *ConstantFoldScalarCall2(StringRef Name,
       else
         return ConstantInt::get(Ty, C0->ssub_sat(*C1));
     case Intrinsic::cttz:
+    case Intrinsic::crc:
     case Intrinsic::ctlz:
       assert(C1 && "Must be constant int");
 
@@ -2836,6 +2839,8 @@ static Constant *ConstantFoldScalarCall2(StringRef Name,
         return PoisonValue::get(Ty);
       if (!C0)
         return Constant::getNullValue(Ty);
+      if (IntrinsicID == Intrinsic::crc)
+        return ConstantInt::get(Ty, C0->countr_zero());
       if (IntrinsicID == Intrinsic::cttz)
         return ConstantInt::get(Ty, C0->countr_zero());
       else

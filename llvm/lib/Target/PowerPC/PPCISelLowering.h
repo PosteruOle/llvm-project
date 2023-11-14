@@ -782,6 +782,12 @@ namespace llvm {
       return true;
     }
 
+    /*
+    bool isCheapToSpeculateCrc(Type *Ty) const override {
+      return true;
+    }
+    */
+
     bool isCheapToSpeculateCtlz(Type *Ty) const override {
       return true;
     }

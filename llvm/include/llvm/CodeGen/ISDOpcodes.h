@@ -713,6 +713,9 @@ enum NodeType {
   /// Byte Swap and Counting operators.
   BSWAP,
   CTTZ,
+  CRC,
+  CRC8,
+  CRC32,
   CTLZ,
   CTPOP,
   BITREVERSE,
@@ -720,6 +723,7 @@ enum NodeType {
 
   /// Bit counting operators with an undefined result for zero inputs.
   CTTZ_ZERO_UNDEF,
+  CRC_ZERO_UNDEF,
   CTLZ_ZERO_UNDEF,
 
   /// Select(COND, TRUEVAL, FALSEVAL).  If the type of the boolean COND is not

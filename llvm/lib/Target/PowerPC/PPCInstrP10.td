@@ -1662,6 +1662,10 @@ let Predicates = [IsISA3_1] in {
                          "cnttzdm $RA, $RST, $RB", IIC_IntGeneral,
                          [(set i64:$RA,
                          (int_ppc_cnttzdm i64:$RST, i64:$RB))]>;
+   //def CNRCDM : XForm_6<31, 571, (outs g8rc:$RA), (ins g8rc:$RST, g8rc:$RB),
+   //                      "cnrcdm $RA, $RST, $RB", IIC_IntGeneral,
+   //                      [(set i64:$RA,
+   //                      (int_ppc_cnrcdm i64:$RST, i64:$RB))]>;                      
    def XXGENPCVBM :
      XForm_XT6_IMM5_VB5<60, 916, (outs vsrc:$XT), (ins vrrc:$VRB, s5imm:$IMM),
                         "xxgenpcvbm $XT, $VRB, $IMM", IIC_VecGeneral, []>;

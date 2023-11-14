@@ -924,6 +924,7 @@ TARGET_BUILTIN(__builtin_pextd, "ULLiULLiULLi", "", "isa-v31-instructions")
 TARGET_BUILTIN(__builtin_cfuged, "ULLiULLiULLi", "", "isa-v31-instructions")
 TARGET_BUILTIN(__builtin_cntlzdm, "ULLiULLiULLi", "", "isa-v31-instructions")
 TARGET_BUILTIN(__builtin_cnttzdm, "ULLiULLiULLi", "", "isa-v31-instructions")
+//TARGET_BUILTIN(__builtin_cnrcdm, "ULLiULLiULLi", "", "isa-v31-instructions")
 
 // Double-double (un)pack
 BUILTIN(__builtin_unpack_longdouble, "dLdIi", "")
