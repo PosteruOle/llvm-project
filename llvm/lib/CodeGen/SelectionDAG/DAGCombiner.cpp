@@ -2939,7 +2939,6 @@ SDValue DAGCombiner::visitADD(SDNode *N) {
     }
   }
 
-
   if (SDValue Combined = visitADDLike(N))
     return Combined;
 
