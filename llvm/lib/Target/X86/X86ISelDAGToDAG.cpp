@@ -4779,6 +4779,7 @@ bool X86DAGToDAGISel::tryMatchBitSelect(SDNode *N) {
 }
 
 void X86DAGToDAGISel::Select(SDNode *Node) {
+  errs() << "We have entered the X86DAGToDAGISel::Select function!\n";
   MVT NVT = Node->getSimpleValueType(0);
   unsigned Opcode = Node->getOpcode();;
   SDLoc dl(Node);
@@ -4789,7 +4790,14 @@ void X86DAGToDAGISel::Select(SDNode *Node) {
     return;   // Already selected.
   }
 
-
+  errs() << "ISD::ADD = " << ISD::ADD << "\n";
+  errs() << "ISD::SHL = " << ISD::SHL << "\n";
+  errs() << "ISD::MUL = " << ISD::MUL << "\n";
+  errs() << "MVT::i16 = " << MVT::i16 << "\n";
+  errs() << "MVT::i32 = " << MVT::i32 << "\n";
+  errs() << "MVT::i64 = " << MVT::i64 << "\n";
+  errs() << "MVT NVT  = " << NVT << "\n";
+  errs() << "Opcode = " << Opcode << "\n";
   switch (Opcode) {
   default: break;
   case ISD::INTRINSIC_W_CHAIN: {
@@ -5064,8 +5072,7 @@ void X86DAGToDAGISel::Select(SDNode *Node) {
     // the patterns on the add/sub/and/or/xor with immediate paterns in the
     // tablegen files to check immediate use count without making the patterns
     // unavailable to the fast-isel table.
-    if (!CurDAG->shouldOptForSize())
-      break;
+    errs() << "Here we should write solution for 3rd task!\n";
 
     // Only handle i8/i16/i32/i64.
     if (NVT != MVT::i8 && NVT != MVT::i16 && NVT != MVT::i32 && NVT != MVT::i64)
@@ -5073,6 +5080,65 @@ void X86DAGToDAGISel::Select(SDNode *Node) {
 
     SDValue N0 = Node->getOperand(0);
     SDValue N1 = Node->getOperand(1);
+
+    if(Opcode==ISD::ADD && N0==N1 && NVT==MVT::i64){
+      errs() << "We have entered if clause related to i64 type!\n";
+      
+      SDVTList VT = CurDAG->getVTList(NVT);
+      SDValue Const2=CurDAG->getTargetConstant(2, dl, N0.getValueType());
+      SDValue Ops[] = {N0, Const2};
+      SDValue newNode=CurDAG->getNode(ISD::MUL, dl, VT, Ops);
+      ReplaceUses(Node, newNode.getNode());
+      CurDAG->RemoveDeadNode(Node);
+      CurDAG->SelectNodeTo(newNode.getNode(), X86::IMUL64rri32, MVT::i64, Ops);
+
+      return;
+    }
+
+    if(Opcode==ISD::ADD && N0==N1 && NVT==MVT::i32){
+      errs() << "We have entered if clause related to i32 type!\n";
+      
+      SDVTList VT = CurDAG->getVTList(NVT);
+      SDValue Const2=CurDAG->getTargetConstant(2, dl, N0.getValueType());
+      SDValue Ops[] = {N0, Const2};
+      SDValue newNode=CurDAG->getNode(ISD::MUL, dl, VT, Ops);
+      ReplaceUses(Node, newNode.getNode());
+      CurDAG->RemoveDeadNode(Node);
+      CurDAG->SelectNodeTo(newNode.getNode(), X86::IMUL32rri, MVT::i32, Ops);
+
+      return;
+    }
+
+    if(Opcode==ISD::ADD && N0==N1 && NVT==MVT::i16){
+      errs() << "We have entered if clause related to i16 type!\n";
+      
+      SDVTList VT = CurDAG->getVTList(NVT);
+      SDValue Const2=CurDAG->getTargetConstant(2, dl, N0.getValueType());
+      SDValue Ops[] = {N0, Const2};
+      SDValue newNode=CurDAG->getNode(ISD::MUL, dl, VT, Ops);
+      ReplaceUses(Node, newNode.getNode());
+      CurDAG->RemoveDeadNode(Node);
+      CurDAG->SelectNodeTo(newNode.getNode(), X86::IMUL16rri, MVT::i16, Ops);
+
+      return;
+    }
+
+    if(Opcode==ISD::ADD && N0==N1 && NVT==MVT::i8){
+      errs() << "We have entered if clause related to i8 type!\n";
+      
+      SDVTList VT = CurDAG->getVTList(NVT);
+      SDValue Const2=CurDAG->getTargetConstant(2, dl, N0.getValueType());
+      SDValue Ops[] = {N0, Const2};
+      SDValue newNode=CurDAG->getNode(ISD::MUL, dl, VT, Ops);
+      ReplaceUses(Node, newNode.getNode());
+      CurDAG->RemoveDeadNode(Node);
+      CurDAG->SelectNodeTo(newNode.getNode(), X86::IMUL16rri8, MVT::i8, Ops);
+
+      return;
+    }
+
+    if (!CurDAG->shouldOptForSize())
+      break;
 
     auto *Cst = dyn_cast<ConstantSDNode>(N1);
     if (!Cst)

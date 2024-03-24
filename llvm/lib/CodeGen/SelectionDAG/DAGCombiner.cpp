@@ -14,6 +14,7 @@
 // in the LLVM IR and exposed by the various codegen lowering phases.
 //
 //===----------------------------------------------------------------------===//
+#include "llvm/CodeGen/SelectionDAGISel.h"
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -2908,6 +2909,35 @@ SDValue DAGCombiner::visitADD(SDNode *N) {
   SDValue N1 = N->getOperand(1);
   EVT VT = N0.getValueType();
   SDLoc DL(N);
+
+  errs() << "Welcome to visitADD function!\n";
+
+  if(N0.getNode()->getOpcode()==ISD::ADD && N1.getNode()->getOpcode()==ISD::MUL){
+    errs() << "We are on the right track!\n";
+    SDNode *res1=N0.getNode();
+    SDNode *square2=N1.getNode();
+    if(res1->getOperand(0).getNode()->getOperand(0)==res1->getOperand(0).getNode()->getOperand(1) && res1->getOperand(0).getNode()->getOpcode()==ISD::MUL){
+      errs() << "We have found the first square!\n";
+      if(square2->getOperand(0)==square2->getOperand(1) && square2->getOpcode()==ISD::MUL){
+        errs() << "We have found the second square!\n";
+        SDNode *mul2=res1->getOperand(1).getNode();
+        if(mul2->getOpcode()==ISD::MUL){
+          SDNode *mul=mul2->getOperand(0).getNode();
+          if(mul->getOperand(0)==res1->getOperand(0).getNode()->getOperand(0) && mul->getOperand(1)==square2->getOperand(0)){
+            
+            errs() << "We have successfully recognized binomial square!\n";
+            SDValue binom_tmp=DAG.getNode(ISD::ADD, DL, VT, mul->getOperand(0), mul->getOperand(1));
+            SDValue binom=DAG.getNode(ISD::MUL, DL, VT, binom_tmp, binom_tmp);
+            errs() << "We have successfully created nodes that will decrease binomial square implementation!\n";
+            
+            return binom;
+          } else {
+            errs() << "We haven't found a extended binomial square implementation!\n";
+          }
+        }
+      }
+    }
+  }
 
   if (SDValue Combined = visitADDLike(N))
     return Combined;
