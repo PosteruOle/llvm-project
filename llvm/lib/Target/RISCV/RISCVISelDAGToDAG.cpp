@@ -22,6 +22,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
+#include <vector>
 
 using namespace llvm;
 
@@ -222,8 +223,7 @@ static SDValue selectImm(SelectionDAG *CurDAG, const SDLoc &DL, const MVT VT,
             CurDAG->getMachineNode(RISCV::SLLI, DL, VT, Lo,
                                    CurDAG->getTargetConstant(32, DL, VT)),
             0);
-        return SDValue(CurDAG->getMachineNode(RISCV::ADD, DL, VT, Lo, SLLI),
-                       0);
+        return SDValue(CurDAG->getMachineNode(RISCV::ADD, DL, VT, Lo, SLLI), 0);
       }
     }
   }
@@ -357,8 +357,8 @@ void RISCVDAGToDAGISel::selectVLSEG(SDNode *Node, bool IsMasked,
                              Operands, /*IsLoad=*/true);
 
   const RISCV::VLSEGPseudo *P =
-      RISCV::getVLSEGPseudo(NF, IsMasked, IsTU, IsStrided, /*FF*/ false, Log2SEW,
-                            static_cast<unsigned>(LMUL));
+      RISCV::getVLSEGPseudo(NF, IsMasked, IsTU, IsStrided, /*FF*/ false,
+                            Log2SEW, static_cast<unsigned>(LMUL));
   MachineSDNode *Load =
       CurDAG->getMachineNode(P->Pseudo, DL, MVT::Untyped, MVT::Other, Operands);
 
@@ -666,10 +666,17 @@ bool RISCVDAGToDAGISel::tryShrinkShlLogicImm(SDNode *Node) {
   // Ok, we can reorder to get a smaller immediate.
   unsigned BinOpc;
   switch (Opcode) {
-  default: llvm_unreachable("Unexpected opcode");
-  case ISD::AND: BinOpc = RISCV::ANDI; break;
-  case ISD::OR:  BinOpc = RISCV::ORI;  break;
-  case ISD::XOR: BinOpc = RISCV::XORI; break;
+  default:
+    llvm_unreachable("Unexpected opcode");
+  case ISD::AND:
+    BinOpc = RISCV::ANDI;
+    break;
+  case ISD::OR:
+    BinOpc = RISCV::ORI;
+    break;
+  case ISD::XOR:
+    BinOpc = RISCV::XORI;
+    break;
   }
 
   unsigned ShOpc = SignExt ? RISCV::SLLIW : RISCV::SLLI;
@@ -822,7 +829,47 @@ bool RISCVDAGToDAGISel::tryIndexedLoad(SDNode *Node) {
   return true;
 }
 
+// Returns the quotient of polynomial long division of x^2n by POLYNOMIAL in
+// GF(2^n).
+unsigned create_quotient(unsigned polynomial, size_t n) {
+  std::vector<short> x2n;
+  std::vector<bool> pol, q;
+  // Create vector of bits, for the polynomial.
+  for (size_t i = 0; i < n; i++) {
+    pol.push_back(polynomial & 1);
+    polynomial >>= 1;
+  }
+  pol.push_back(1);
+
+  // Create vector for x^2n polynomial.
+  for (size_t i = 0; i < 2 * (n - 1); i++)
+    x2n.push_back(0);
+  x2n.push_back(1);
+
+  for (size_t i = 0; i < n; i++)
+    q.push_back(0);
+
+  // Calculate the quotient of x^2n/polynomial.
+  for (int i = n - 1; i >= 0; i--) {
+    int d = x2n[i + n - 1];
+    if (d == 0)
+      continue;
+    for (int j = i + n - 1; j >= i; j--)
+      x2n[j] = x2n[j] ^ (pol[j - i] * d);
+    q[i] = d;
+  }
+
+  // Get the number from the vector of 0/1s.
+  unsigned quotient = 0;
+  for (size_t i = 0; i < q.size(); i++) {
+    quotient <<= 1;
+    quotient = quotient | q[q.size() - i - 1];
+  }
+  return quotient;
+}
+
 void RISCVDAGToDAGISel::Select(SDNode *Node) {
+  errs() << "We are inside RISCVDAGToDAGISel::Select function!\n";
   // If we have a custom node, we have already selected.
   if (Node->isMachineOpcode()) {
     LLVM_DEBUG(dbgs() << "== "; Node->dump(CurDAG); dbgs() << "\n");
@@ -839,7 +886,52 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
 
   bool HasBitTest = Subtarget->hasStdExtZbs() || Subtarget->hasVendorXTHeadBs();
 
+  errs() << Opcode << " <-> " << RISCVISD::PSEUDO_CRC << "\n";
+  errs() << Opcode << " <-> " << Intrinsic::riscv_crc_petar << "\n";
+
   switch (Opcode) {
+  case RISCVISD::PSEUDO_CRC: {
+    errs() << "Januar 19th PETAR!\n";
+    // const uint polynomial = 0x04C11DB7;
+    const unsigned polynomial = 0x04C11DB7;
+    const unsigned crc_size = 32;
+    const unsigned GET_MODE_BITSIZE = 64;
+    const unsigned quotient = create_quotient(polynomial, crc_size + 1);
+    errs() << "polynomial = " << polynomial << "\n";
+    errs() << "quotient = " << quotient << "\n";
+    errs() << "crc_size = " << crc_size << "\n";
+    errs() << "GET_MODE_BITSIZE = " << GET_MODE_BITSIZE << "\n";
+    SDNode *NewNode1 = CurDAG->getMachineNode(
+        RISCV::XOR, DL, VT, Node->getOperand(1), Node->getOperand(0));
+    SDNode *NewNode2 =
+        CurDAG->getMachineNode(RISCV::CLMUL, DL, VT, SDValue(NewNode1, 0),
+                               CurDAG->getTargetConstant(quotient, DL, VT));
+    SDNode *NewNode3 =
+        CurDAG->getMachineNode(RISCV::SRLI, DL, VT, SDValue(NewNode2, 0),
+                               CurDAG->getTargetConstant(crc_size, DL, VT));
+    SDNode *NewNode4 =
+        CurDAG->getMachineNode(RISCV::CLMUL, DL, VT, SDValue(NewNode3, 0),
+                               CurDAG->getTargetConstant(polynomial, DL, VT));
+    SDNode *NewNode5 = CurDAG->getMachineNode(
+        RISCV::SLLI, DL, VT, SDValue(NewNode4, 0),
+        CurDAG->getTargetConstant(GET_MODE_BITSIZE - crc_size, DL, VT));
+    SDNode *NewNode6 = CurDAG->getMachineNode(
+        RISCV::SRLI, DL, VT, SDValue(NewNode5, 0),
+        CurDAG->getTargetConstant(GET_MODE_BITSIZE - crc_size, DL, VT));
+
+    /*
+    SDValue RetRegister = CurDAG->getRegister(RISCV::X1, VT);
+    SDNode *FinalNode = CurDAG->getMachineNode(RISCV::LD, DL, VT, RetRegister,
+                                               SDValue(NewNode6, 0));
+    */
+    ReplaceNode(Node, NewNode6);
+    // ReplaceNode(Node, FinalNode);
+    return;
+  }
+  case ISD::ZERO_EXTEND: {
+    errs() << "Hi from ZERO_EXTEND!\n";
+    return;
+  }
   case ISD::Constant: {
     assert(VT == Subtarget->getXLenVT() && "Unexpected VT");
     auto *ConstNode = cast<ConstantSDNode>(Node);
@@ -945,8 +1037,8 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
       ReplaceUses(SDValue(Node, 0), SDValue(Lo, 0));
     }
     if (!SDValue(Node, 1).use_empty()) {
-      SDNode *Hi = CurDAG->getMachineNode(RISCV::FMVH_X_D, DL, VT,
-                                          Node->getOperand(0));
+      SDNode *Hi =
+          CurDAG->getMachineNode(RISCV::FMVH_X_D, DL, VT, Node->getOperand(0));
       ReplaceUses(SDValue(Node, 1), SDValue(Hi, 0));
     }
 
@@ -1353,8 +1445,7 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
     // make it more costly to materialize. Otherwise, using a SLLI might allow
     // it to be compressed.
     bool IsANDIOrZExt =
-        isInt<12>(C2) ||
-        (C2 == UINT64_C(0xFFFF) && Subtarget->hasStdExtZbb());
+        isInt<12>(C2) || (C2 == UINT64_C(0xFFFF) && Subtarget->hasStdExtZbb());
     // With XTHeadBb, we can use TH.EXTU.
     IsANDIOrZExt |= C2 == UINT64_C(0xFFFF) && Subtarget->hasVendorXTHeadBb();
     if (IsANDIOrZExt && (isInt<12>(N1C->getSExtValue()) || !N0.hasOneUse()))
@@ -1749,7 +1840,8 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
       unsigned Log2SEW = Log2_32(VT.getScalarSizeInBits());
 
       unsigned CurOp = 2;
-      // The riscv_vlm intrinsic are always tail agnostic and no passthru operand.
+      // The riscv_vlm intrinsic are always tail agnostic and no passthru
+      // operand.
       bool HasPassthruOperand = IntNo != Intrinsic::riscv_vlm;
       // Masked intrinsic only have TU version pseduo instructions.
       bool IsTU = HasPassthruOperand &&
@@ -1802,8 +1894,8 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
       const RISCV::VLEPseudo *P =
           RISCV::getVLEPseudo(IsMasked, IsTU, /*Strided*/ false, /*FF*/ true,
                               Log2SEW, static_cast<unsigned>(LMUL));
-      MachineSDNode *Load = CurDAG->getMachineNode(
-          P->Pseudo, DL, Node->getVTList(), Operands);
+      MachineSDNode *Load =
+          CurDAG->getMachineNode(P->Pseudo, DL, Node->getVTList(), Operands);
       if (auto *MemOp = dyn_cast<MemSDNode>(Node))
         CurDAG->setNodeMemRefs(Load, {MemOp->getMemOperand()});
 
@@ -2079,6 +2171,17 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
     ReplaceNode(Node, Extract.getNode());
     return;
   }
+  case Intrinsic::riscv_crc_petar: {
+    errs() << "We are in SELECT function under the Intrinsic::riscv_crc_petar "
+              "case!\n";
+    SDValue petar1 = Node->getOperand(0);
+    SDValue petar2 = Node->getOperand(1);
+    SDNode *NewNode =
+        CurDAG->getMachineNode(RISCV::ADD, DL, VT, petar1, petar2);
+    ReplaceNode(Node, NewNode);
+    return;
+  }
+
   case RISCVISD::VMV_S_X_VL:
   case RISCVISD::VFMV_S_F_VL:
   case RISCVISD::VMV_V_X_VL:
@@ -2128,8 +2231,8 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
 
     RISCVII::VLMUL LMUL = RISCVTargetLowering::getLMUL(VT);
     const RISCV::VLEPseudo *P = RISCV::getVLEPseudo(
-        /*IsMasked*/ false, /*IsTU*/ false, IsStrided, /*FF*/ false,
-        Log2SEW, static_cast<unsigned>(LMUL));
+        /*IsMasked*/ false, /*IsTU*/ false, IsStrided, /*FF*/ false, Log2SEW,
+        static_cast<unsigned>(LMUL));
     MachineSDNode *Load =
         CurDAG->getMachineNode(P->Pseudo, DL, {VT, MVT::Other}, Operands);
     // Update the chain.
@@ -2142,6 +2245,7 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
   }
   }
 
+  errs() << "We will now call SelectCode() method!\n";
   // Select the default instruction.
   SelectCode(Node);
 }
@@ -2197,10 +2301,10 @@ bool RISCVDAGToDAGISel::SelectFrameAddrRegImm(SDValue Addr, SDValue &Base,
   if (auto *FIN = dyn_cast<FrameIndexSDNode>(Addr.getOperand(0))) {
     int64_t CVal = cast<ConstantSDNode>(Addr.getOperand(1))->getSExtValue();
     if (isInt<12>(CVal)) {
-      Base = CurDAG->getTargetFrameIndex(FIN->getIndex(),
-                                         Subtarget->getXLenVT());
-      Offset = CurDAG->getTargetConstant(CVal, SDLoc(Addr),
-                                         Subtarget->getXLenVT());
+      Base =
+          CurDAG->getTargetFrameIndex(FIN->getIndex(), Subtarget->getXLenVT());
+      Offset =
+          CurDAG->getTargetConstant(CVal, SDLoc(Addr), Subtarget->getXLenVT());
       return true;
     }
   }
@@ -2432,7 +2536,8 @@ bool RISCVDAGToDAGISel::selectShiftMask(SDValue N, unsigned ShiftWidth,
   // Shift instructions on RISC-V only read the lower 5 or 6 bits of the shift
   // amount. If there is an AND on the shift amount, we can bypass it if it
   // doesn't affect any of those bits.
-  if (ShAmt.getOpcode() == ISD::AND && isa<ConstantSDNode>(ShAmt.getOperand(1))) {
+  if (ShAmt.getOpcode() == ISD::AND &&
+      isa<ConstantSDNode>(ShAmt.getOperand(1))) {
     const APInt &AndMask = ShAmt.getConstantOperandAPInt(1);
 
     // Since the max shift amount is a power of 2 we can subtract 1 to make a
@@ -2471,8 +2576,8 @@ bool RISCVDAGToDAGISel::selectShiftMask(SDValue N, unsigned ShiftWidth,
       EVT VT = ShAmt.getValueType();
       SDValue Zero = CurDAG->getRegister(RISCV::X0, VT);
       unsigned NegOpc = VT == MVT::i64 ? RISCV::SUBW : RISCV::SUB;
-      MachineSDNode *Neg = CurDAG->getMachineNode(NegOpc, DL, VT, Zero,
-                                                  ShAmt.getOperand(1));
+      MachineSDNode *Neg =
+          CurDAG->getMachineNode(NegOpc, DL, VT, Zero, ShAmt.getOperand(1));
       ShAmt = SDValue(Neg, 0);
       return true;
     }
@@ -2796,10 +2901,14 @@ bool RISCVDAGToDAGISel::hasAllNBitUsers(SDNode *Node, unsigned Bits,
     case RISCV::FCVT_D_W:
     case RISCV::FCVT_D_WU:
     case RISCV::TH_REVW:
-    case RISCV::TH_SRRIW:
+    case RISCV::TH_SRRIW: {
+      if (User->getMachineOpcode() == RISCV::SRLW) {
+        errs() << "We are at RISCVISELDAGTODAG.CPP in CASE RISCV::SRLW!\n";
+      }
       if (Bits < 32)
         return false;
       break;
+    }
     case RISCV::SLL:
     case RISCV::SRA:
     case RISCV::SRL:
@@ -2962,8 +3071,7 @@ static bool selectVSplatSimmHelper(SDValue N, SDValue &SplatVal,
     return false;
   assert(N.getNumOperands() == 3 && "Unexpected number of operands");
 
-  int64_t SplatImm =
-      cast<ConstantSDNode>(N.getOperand(1))->getSExtValue();
+  int64_t SplatImm = cast<ConstantSDNode>(N.getOperand(1))->getSExtValue();
 
   // The semantics of RISCVISD::VMV_V_X_VL is that when the operand
   // type is wider than the resulting vector element type: an implicit
@@ -3010,8 +3118,7 @@ bool RISCVDAGToDAGISel::selectVSplatUimm5(SDValue N, SDValue &SplatVal) {
       !isa<ConstantSDNode>(N.getOperand(1)))
     return false;
 
-  int64_t SplatImm =
-      cast<ConstantSDNode>(N.getOperand(1))->getSExtValue();
+  int64_t SplatImm = cast<ConstantSDNode>(N.getOperand(1))->getSExtValue();
 
   if (!isUInt<5>(SplatImm))
     return false;
@@ -3089,11 +3196,21 @@ bool RISCVDAGToDAGISel::doPeepholeSExtW(SDNode *N) {
     switch (N0.getMachineOpcode()) {
     default:
       llvm_unreachable("Unexpected opcode!");
-    case RISCV::ADD:  Opc = RISCV::ADDW;  break;
-    case RISCV::ADDI: Opc = RISCV::ADDIW; break;
-    case RISCV::SUB:  Opc = RISCV::SUBW;  break;
-    case RISCV::MUL:  Opc = RISCV::MULW;  break;
-    case RISCV::SLLI: Opc = RISCV::SLLIW; break;
+    case RISCV::ADD:
+      Opc = RISCV::ADDW;
+      break;
+    case RISCV::ADDI:
+      Opc = RISCV::ADDIW;
+      break;
+    case RISCV::SUB:
+      Opc = RISCV::SUBW;
+      break;
+    case RISCV::MUL:
+      Opc = RISCV::MULW;
+      break;
+    case RISCV::SLLI:
+      Opc = RISCV::SLLIW;
+      break;
     }
 
     SDValue N00 = N0.getOperand(0);
@@ -3105,8 +3222,7 @@ bool RISCVDAGToDAGISel::doPeepholeSExtW(SDNode *N) {
       break;
 
     SDNode *Result =
-        CurDAG->getMachineNode(Opc, SDLoc(N), N->getValueType(0),
-                               N00, N01);
+        CurDAG->getMachineNode(Opc, SDLoc(N), N->getValueType(0), N00, N01);
     ReplaceUses(N, Result);
     return true;
   }

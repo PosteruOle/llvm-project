@@ -16,6 +16,9 @@
 // targets).
 //
 //===----------------------------------------------------------------------===//
+//llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+//#include "llvm/lib/Target/RISCV/RISCVISelLowering.h"
+
 
 #include "LegalizeTypes.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -42,20 +45,46 @@ void DAGTypeLegalizer::PromoteIntegerResult(SDNode *N, unsigned ResNo) {
   LLVM_DEBUG(dbgs() << "Promote integer result: "; N->dump(&DAG);
              dbgs() << "\n");
   SDValue Res = SDValue();
-
+  errs() << "Here?! 1\n";
+  errs() << N->getOpcode() << "\n";
+  if(N->getOpcode()==ISD::INTRINSIC_WO_CHAIN){
+    if (CustomLowerNode(N, N->getValueType(ResNo), false)) {
+    LLVM_DEBUG(dbgs() << "Node has been custom expanded, done\n");
+    return;
+    }
+  }
+  /*
+  if(N->getOpcode()==861){
+    if (CustomLowerNode(N, N->getValueType(ResNo), false)) {
+    LLVM_DEBUG(dbgs() << "Node has been custom expanded, done\n");
+    return;
+    }
+  }
+  */
+  errs() << "Here?! 2\n";
   // See if the target wants to custom expand this node.
   if (CustomLowerNode(N, N->getValueType(ResNo), true)) {
     LLVM_DEBUG(dbgs() << "Node has been custom expanded, done\n");
     return;
   }
-
+  errs() << "Here?! 3\n";
   switch (N->getOpcode()) {
   default:
+  errs() << "Here we are right?!\n";
+  errs() << N->getOpcode() << " <-> " << ISD::CRC8 << "\n";
 #ifndef NDEBUG
     dbgs() << "PromoteIntegerResult #" << ResNo << ": ";
     N->dump(&DAG); dbgs() << "\n";
 #endif
     llvm_unreachable("Do not know how to promote this operator!");
+  case ISD::INTRINSIC_WO_CHAIN: 
+  errs() << "Here we are right?!!\n";
+  Res = PromoteIntRes_CRC8(N); 
+  break;
+  case ISD::INLINEASM: 
+    errs() << "We are in ISD::INLINEASM case!\n";
+    Res=PromoteIntRes_INLINEASM(N);
+    break;
   case ISD::MERGE_VALUES:Res = PromoteIntRes_MERGE_VALUES(N, ResNo); break;
   case ISD::AssertSext:  Res = PromoteIntRes_AssertSext(N); break;
   case ISD::AssertZext:  Res = PromoteIntRes_AssertZext(N); break;
@@ -68,6 +97,8 @@ void DAGTypeLegalizer::PromoteIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::CTLZ:        Res = PromoteIntRes_CTLZ(N); break;
   case ISD::PARITY:
   case ISD::CTPOP:       Res = PromoteIntRes_CTPOP_PARITY(N); break;
+  case ISD::CRC8:
+                         Res = PromoteIntRes_CRC8(N); break;
   case ISD::CTTZ_ZERO_UNDEF:
   case ISD::CTTZ:        Res = PromoteIntRes_CTTZ(N); break;
   case ISD::EXTRACT_VECTOR_ELT:
@@ -609,6 +640,32 @@ SDValue DAGTypeLegalizer::PromoteIntRes_CTPOP_PARITY(SDNode *N) {
   // Zero extend to the promoted type and do the count or parity there.
   SDValue Op = ZExtPromotedInteger(N->getOperand(0));
   return DAG.getNode(N->getOpcode(), SDLoc(N), Op.getValueType(), Op);
+}
+
+SDValue DAGTypeLegalizer::PromoteIntRes_INLINEASM(SDNode *N){
+  N->getOperand(0).dump();
+  N->getOperand(1).dump();
+  //N->getOperand(2).dump();
+  SDValue N0=N->getOperand(0);
+  SDValue N1=N->getOperand(1);
+  SDLoc dl(N);
+  EVT OVT=N->getValueType(0);
+  errs() << "We entered PromoteIntRes_INLINEASM function!\n";
+  SDValue Ops[]={N0, N1};
+  return DAG.getNode(ISD::INLINEASM, dl, OVT, Ops);
+}  
+
+SDValue DAGTypeLegalizer::PromoteIntRes_CRC8(SDNode *N){
+  N->getOperand(0).dump();
+  N->getOperand(1).dump();
+  N->getOperand(2).dump();
+  SDValue N1=N->getOperand(1);
+  SDValue N2=N->getOperand(2);
+  SDLoc dl(N);
+  EVT OVT=N->getValueType(0);
+  errs() << "We entered PromoteIntRes_CRC8 function!\n";
+  SDValue Ops[]={N1, N2};
+  return DAG.getNode(ISD::CRC8, dl, OVT, Ops);
 }
 
 SDValue DAGTypeLegalizer::PromoteIntRes_CTTZ(SDNode *N) {

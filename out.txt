@@ -1,2 +1,1 @@
-llc: Unknown command line argument '-debug'.  Try: 'build/bin/llc --help'
-llc: Did you mean '--mcpu'?
+bash: build/bin/llc: No such file or directory

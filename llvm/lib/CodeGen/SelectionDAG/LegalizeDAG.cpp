@@ -987,6 +987,9 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
   //TargetLowering::LegalizeAction Action = TargetLowering::Custom;
   bool SimpleFinishLegalizing = true;
   switch (Node->getOpcode()) {
+  case ISD::CRC8:
+    Action=TargetLowering::Custom;
+    break;
   case ISD::INTRINSIC_W_CHAIN:
   case ISD::INTRINSIC_WO_CHAIN:
   case ISD::INTRINSIC_VOID:
@@ -1303,6 +1306,12 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
       LLVM_DEBUG(dbgs() << "Trying custom legalization\n");
       // FIXME: The handling for custom lowering with multiple results is
       // a complete mess.
+      if(Node->getOpcode()==ISD::CRC8){
+        errs() << "Calling loweroperation function!\n";
+        SDValue Res=TLI.LowerOperation(SDValue(Node, 0), DAG);
+        return;
+      }
+
       if (SDValue Res = TLI.LowerOperation(SDValue(Node, 0), DAG)) {
         if (!(Res.getNode() != Node || Res.getResNo() != 0))
           return;
@@ -2837,6 +2846,10 @@ bool SelectionDAGLegalize::ExpandNode(SDNode *Node) {
   case ISD::CTTZ:
   case ISD::CTTZ_ZERO_UNDEF:
     if ((Tmp1 = TLI.expandCTTZ(Node, DAG)))
+      Results.push_back(Tmp1);
+    break;
+  case ISD::CRC8:
+    if ((Tmp1 = TLI.expandCRC8(Node, DAG)))
       Results.push_back(Tmp1);
     break;
   case ISD::CRC32:

@@ -58,6 +58,9 @@ VerboseDAGDumping("dag-dump-verbose", cl::Hidden,
 std::string SDNode::getOperationName(const SelectionDAG *G) const {
   switch (getOpcode()) {
   default:
+    if(getOpcode()==946){
+      return "Pseudo_CRC";
+    }
     if (getOpcode() < ISD::BUILTIN_OP_END)
       return "<<Unknown DAG Node>>";
     if (isMachineOpcode()) {
@@ -446,6 +449,7 @@ std::string SDNode::getOperationName(const SelectionDAG *G) const {
   case ISD::CTPOP:                      return "ctpop";
   case ISD::CTTZ:                       return "cttz";
   case ISD::CTTZ_ZERO_UNDEF:            return "cttz_zero_undef";
+  case ISD::CRC8:                       return "crc8";
   case ISD::CTLZ:                       return "ctlz";
   case ISD::CTLZ_ZERO_UNDEF:            return "ctlz_zero_undef";
   case ISD::PARITY:                     return "parity";
@@ -710,7 +714,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
     OS << ":" << N->getVT();
   }
   else if (const LoadSDNode *LD = dyn_cast<LoadSDNode>(this)) {
-    OS << "<";
+    OS << "<LoadSDNode";
 
     printMemOperand(OS, *LD->getMemOperand(), G);
 
@@ -730,7 +734,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const StoreSDNode *ST = dyn_cast<StoreSDNode>(this)) {
-    OS << "<";
+    OS << "<StoreSDNode";
     printMemOperand(OS, *ST->getMemOperand(), G);
 
     if (ST->isTruncatingStore())
@@ -742,7 +746,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const MaskedLoadSDNode *MLd = dyn_cast<MaskedLoadSDNode>(this)) {
-    OS << "<";
+    OS << "<MaskedLoadSDNode";
 
     printMemOperand(OS, *MLd->getMemOperand(), G);
 
@@ -765,7 +769,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const MaskedStoreSDNode *MSt = dyn_cast<MaskedStoreSDNode>(this)) {
-    OS << "<";
+    OS << "<MaskedStoreSDNode";
     printMemOperand(OS, *MSt->getMemOperand(), G);
 
     if (MSt->isTruncatingStore())
@@ -780,7 +784,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const auto *MGather = dyn_cast<MaskedGatherSDNode>(this)) {
-    OS << "<";
+    OS << "<MaskedGatherSDNode";
     printMemOperand(OS, *MGather->getMemOperand(), G);
 
     bool doExt = true;
@@ -799,7 +803,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const auto *MScatter = dyn_cast<MaskedScatterSDNode>(this)) {
-    OS << "<";
+    OS << "<MaskedScatterSDNode";
     printMemOperand(OS, *MScatter->getMemOperand(), G);
 
     if (MScatter->isTruncatingStore())
@@ -811,7 +815,7 @@ void SDNode::print_details(raw_ostream &OS, const SelectionDAG *G) const {
 
     OS << ">";
   } else if (const MemSDNode *M = dyn_cast<MemSDNode>(this)) {
-    OS << "<";
+    OS << "<MemSDNode";
     printMemOperand(OS, *M->getMemOperand(), G);
     OS << ">";
   } else if (const BlockAddressSDNode *BA =

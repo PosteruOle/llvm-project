@@ -469,6 +469,7 @@ namespace {
     SDValue visitCTLZ_ZERO_UNDEF(SDNode *N);
     SDValue visitCTTZ(SDNode *N);
     SDValue visitCTTZ_ZERO_UNDEF(SDNode *N);
+    SDValue visitCRC8(SDNode *N);
     //SDValue visitCRC(SDNode *N);
     //SDValue visitCRC_ZERO_UNDEF(SDNode *N);
     SDValue visitCTPOP(SDNode *N);
@@ -1941,6 +1942,7 @@ SDValue DAGCombiner::visit(SDNode *N) {
   case ISD::CTLZ_ZERO_UNDEF:    return visitCTLZ_ZERO_UNDEF(N);
   case ISD::CTTZ:               return visitCTTZ(N);
   case ISD::CTTZ_ZERO_UNDEF:    return visitCTTZ_ZERO_UNDEF(N);
+  case ISD::CRC8:               return visitCRC8(N);
   //case ISD::CRC:                return visitCTTZ(N); //return visitCRC(N);
   //case ISD::CRC_ZERO_UNDEF:     return visitCTTZ_ZERO_UNDEF(N); //return visitCRC_ZERO_UNDEF(N);
   case ISD::CTPOP:              return visitCTPOP(N);
@@ -2931,12 +2933,33 @@ SDValue DAGCombiner::visitADD(SDNode *N) {
             errs() << "We have successfully created nodes that will decrease binomial square implementation!\n";
             
             return binom;
-          } else {
-            errs() << "We haven't found a extended binomial square implementation!\n";
           }
         }
       }
     }
+  }
+
+  if(N0.getNode()->getOpcode()==ISD::ADD && N1.getNode()->getOpcode()==ISD::MUL){
+    errs() << "We are on the right track!\n";
+    SDNode *res1=N0.getNode();
+    SDNode *mul2=N1.getNode();
+    if(res1->getOperand(0).getNode()->getOperand(0)==res1->getOperand(0).getNode()->getOperand(1) && res1->getOperand(0).getNode()->getOpcode()==ISD::MUL){
+      errs() << "We have found the first square!\n";
+      if(res1->getOperand(1).getNode()->getOperand(0)==res1->getOperand(1).getNode()->getOperand(1) && res1->getOperand(1).getNode()->getOpcode()==ISD::MUL){
+        errs() << "We have found the second square!\n";
+        if(mul2->getOperand(0).getNode()->getOperand(0)==res1->getOperand(0).getNode()->getOperand(0) && mul2->getOperand(0).getNode()->getOperand(1)==res1->getOperand(1).getNode()->getOperand(0)){
+          if(mul2->getOperand(1)==DAG.getConstant(2, DL, VT)){
+            
+            errs() << "We have successfully recognized binomial square!\n";
+            SDValue binom_tmp=DAG.getNode(ISD::ADD, DL, VT, res1->getOperand(0).getNode()->getOperand(0), res1->getOperand(1).getNode()->getOperand(0));
+            SDValue binom=DAG.getNode(ISD::MUL, DL, VT, binom_tmp, binom_tmp);
+            errs() << "We have successfully created nodes that will decrease binomial square implementation!\n";
+            
+            return binom;       
+          }
+        }
+      }
+    }  
   }
 
   if (SDValue Combined = visitADDLike(N))
@@ -10932,6 +10955,24 @@ SDValue DAGCombiner::visitCTTZ(SDNode *N) {
   SDValue N0 = N->getOperand(0);
   EVT VT = N->getValueType(0);
 
+  // fold (cttz c1) -> c2
+  if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
+    return DAG.getNode(ISD::CTTZ, SDLoc(N), VT, N0);
+
+  // If the value is known never to be zero, switch to the undef version.
+  if (!LegalOperations || TLI.isOperationLegal(ISD::CTTZ_ZERO_UNDEF, VT)) {
+    if (DAG.isKnownNeverZero(N0))
+      return DAG.getNode(ISD::CTTZ_ZERO_UNDEF, SDLoc(N), VT, N0);
+  }
+
+  return SDValue();
+}
+
+SDValue DAGCombiner::visitCRC8(SDNode *N) {
+  SDValue N0 = N->getOperand(0);
+  SDValue N1 = N->getOperand(1);
+  EVT VT = N->getValueType(0);
+  return DAG.getNode(ISD::ADD, SDLoc(N), VT, N0, N1);
   // fold (cttz c1) -> c2
   if (DAG.isConstantIntBuildVectorOrConstantInt(N0))
     return DAG.getNode(ISD::CTTZ, SDLoc(N), VT, N0);

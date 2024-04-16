@@ -245,6 +245,7 @@ bool DAGTypeLegalizer::run() {
     // types are illegal.
     for (unsigned i = 0, NumResults = N->getNumValues(); i < NumResults; ++i) {
       EVT ResultVT = N->getValueType(i);
+      errs() << ResultVT.getEVTString() << "\n";
       LLVM_DEBUG(dbgs() << "Analyzing result type: " << ResultVT << "\n");
       switch (getTypeAction(ResultVT)) {
       case TargetLowering::TypeLegal:
@@ -923,7 +924,13 @@ SDValue DAGTypeLegalizer::CreateStackStoreLoad(SDValue Op,
 /// illegal ResNo in that case.
 bool DAGTypeLegalizer::CustomLowerNode(SDNode *N, EVT VT, bool LegalizeResult) {
   // See if the target wants to custom lower this node.
+  errs() << "CustomLowerNode!!!!!!!\n";
+  //errs() << N->getOpcode() << "\n";
   if (TLI.getOperationAction(N->getOpcode(), VT) != TargetLowering::Custom)
+    return false;
+  
+  errs() << "CustomLowerNode?!\n";
+  if(N->getOpcode()==861)
     return false;
 
   SmallVector<SDValue, 8> Results;

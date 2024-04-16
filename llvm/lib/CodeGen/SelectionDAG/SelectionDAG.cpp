@@ -5349,6 +5349,8 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
 
 SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
                               SDValue Operand, const SDNodeFlags Flags) {
+  errs() << "Hi from SelectionDAG::getNode method!\n";
+  errs() << Opcode << " <-> " << ISD::CRC8 << "\n";
   assert(Operand.getOpcode() != ISD::DELETED_NODE &&
          "Operand is DELETED_NODE!");
   // Constant fold unary operations with an integer constant operand. Even
@@ -5417,7 +5419,7 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
       return getConstant(Val.countr_zero(), DL, VT, C->isTargetOpcode(),
                          C->isOpaque());
     case ISD::CRC32:
-    case ISD::CRC:
+    //case ISD::CRC8:
     case ISD::CRC_ZERO_UNDEF:
       return getConstant(Val.countr_zero(), DL, VT, C->isTargetOpcode(),
                          C->isOpaque());                     
@@ -5776,7 +5778,6 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
       return Operand;
     break;
   case ISD::CTLZ:
-  //case ISD::CRC:
   case ISD::CTTZ:
     if (Operand.getValueType().getScalarType() == MVT::i1)
       return getNOT(DL, Operand, Operand.getValueType());
@@ -6317,6 +6318,8 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
          N2.getOpcode() != ISD::DELETED_NODE &&
          "Operand is DELETED_NODE!");
 
+  errs() << "We are in getNode() method in SELECTIONDAG.CPP file!\n";
+
   canonicalizeCommutativeBinop(Opcode, N1, N2);
 
   auto *N1C = dyn_cast<ConstantSDNode>(N1);
@@ -6329,6 +6332,9 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
 
   switch (Opcode) {
   default: break;
+  case ISD::CRC8:
+    errs() << "We are in getNode() method in SELECTIONDAG.CPP file! 2\n";
+    return N2;
   case ISD::TokenFactor:
     assert(VT == MVT::Other && N1.getValueType() == MVT::Other &&
            N2.getValueType() == MVT::Other && "Invalid token factor!");
@@ -6775,6 +6781,7 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
   SDVTList VTs = getVTList(VT);
   SDValue Ops[] = {N1, N2};
   if (VT != MVT::Glue) {
+    errs() << "Turn left!\n";
     FoldingSetNodeID ID;
     AddNodeIDNode(ID, Opcode, VTs, Ops);
     void *IP = nullptr;
@@ -6788,13 +6795,16 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     createOperands(N, Ops);
     CSEMap.InsertNode(N, IP);
   } else {
+    errs() << "Turn right!\n";
     N = newSDNode<SDNode>(Opcode, DL.getIROrder(), DL.getDebugLoc(), VTs);
     createOperands(N, Ops);
   }
 
   InsertNode(N);
   SDValue V = SDValue(N, 0);
+
   NewSDValueDbgMsg(V, "Creating new node: ", this);
+  errs() << "Still in the getNode() method?!\n";
   return V;
 }
 

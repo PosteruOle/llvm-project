@@ -8593,6 +8593,17 @@ SDValue TargetLowering::expandCTTZ(SDNode *Node, SelectionDAG &DAG) const {
   return DAG.getNode(ISD::CTPOP, dl, VT, Tmp);
 }
 
+SDValue TargetLowering::expandCRC8(SDNode *Node, SelectionDAG &DAG) const{
+  //We have to change this function!
+  SDLoc dl(Node);
+  EVT VT = Node->getValueType(0);
+  SDValue Op = Node->getOperand(0);
+  unsigned NumBitsPerElt = VT.getScalarSizeInBits();
+  errs() << "TargetLowering::expandCRC8 we are here?!\n";
+  return DAG.getNode(ISD::AND, dl, VT, DAG.getNOT(dl, Op, VT),
+                     DAG.getNode(ISD::SUB, dl, VT, Op, DAG.getConstant(1, dl, VT)));
+}
+
 SDValue TargetLowering::expandCRC(SDNode *Node, SelectionDAG &DAG) const {
   //We have to change this function!
   SDLoc dl(Node);

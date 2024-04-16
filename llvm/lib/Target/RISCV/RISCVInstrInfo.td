@@ -41,6 +41,12 @@ def SDT_RISCVIntUnaryOpW : SDTypeProfile<1, 1, [
 def SDT_RISCVIntBinOpW : SDTypeProfile<1, 2, [
   SDTCisSameAs<0, 1>, SDTCisSameAs<0, 2>, SDTCisVT<0, i64>
 ]>;
+def SDT_RISCVIntBinOpPT : SDTypeProfile<1, 2, [
+  SDTCisSameAs<0, 1>, SDTCisSameAs<0, 2>, SDTCisVT<0, i16>
+]>;
+def SDT_RISCVIntBinOpST : SDTypeProfile<1, 2, [
+  SDTCisSameAs<0, 2>, SDTCisVT<0, i16>, SDTCisVT<1, i8>, SDTCisVT<2, i16>
+]>;
 def SDT_RISCVIntShiftDOpW : SDTypeProfile<1, 3, [
   SDTCisSameAs<0, 1>, SDTCisSameAs<0, 2>, SDTCisVT<0, i64>, SDTCisVT<3, i64>
 ]>;
@@ -67,6 +73,9 @@ def riscv_brcc      : SDNode<"RISCVISD::BR_CC", SDT_RISCVBrCC,
 def riscv_tail      : SDNode<"RISCVISD::TAIL", SDT_RISCVCall,
                              [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
                               SDNPVariadic]>;
+
+//Petar's insertion!
+def riscv_pseudo_crc      : SDNode<"RISCVISD::PSEUDO_CRC", SDT_RISCVIntBinOpW>;
 def riscv_sllw      : SDNode<"RISCVISD::SLLW", SDT_RISCVIntBinOpW>;
 def riscv_sraw      : SDNode<"RISCVISD::SRAW", SDT_RISCVIntBinOpW>;
 def riscv_srlw      : SDNode<"RISCVISD::SRLW", SDT_RISCVIntBinOpW>;
@@ -900,7 +909,7 @@ def : InstAlias<"nop",           (ADDI      X0,      X0,       0)>;
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Size = 32,
     isCodeGenOnly = 0, isAsmParserOnly = 1 in
 def PseudoLI : Pseudo<(outs GPR:$rd), (ins ixlenimm_li:$imm), [],
-                      "li", "$rd, $imm">;
+                      "li", "$rd, $imm">;                    
 
 def PseudoLB  : PseudoLoad<"lb">;
 def PseudoLBU : PseudoLoad<"lbu">;
@@ -1434,6 +1443,12 @@ def PseudoCCSUBW : Pseudo<(outs GPR:$dst),
                    Sched<[WriteSFB, ReadSFB, ReadSFB, ReadSFB, ReadSFB, ReadSFB]>;
 }
 
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
+
+def PseudoCRC32 : Pseudo<(outs GPR:$dst),
+                          (ins GPR:$lhs, GPR:$rhs), [], "pseudo_crc", "$dst, $lhs, $rhs">;
+}
+
 multiclass SelectCC_GPR_rrirr<DAGOperand valty> {
   let usesCustomInserter = 1 in
   def _Using_CC_GPR : Pseudo<(outs valty:$dst),
@@ -1816,6 +1831,7 @@ def : Pat<(i64 (sra (shl GPR:$rs1, (i64 32)), uimm6gt32:$shamt)),
 
 def : PatGprGpr<shiftopw<riscv_sllw>, SLLW>;
 def : PatGprGpr<shiftopw<riscv_srlw>, SRLW>;
+def : PatGprGpr<riscv_pseudo_crc, PseudoCRC32>;
 def : PatGprGpr<shiftopw<riscv_sraw>, SRAW>;
 
 // Select W instructions if only the lower 32 bits of the result are used.

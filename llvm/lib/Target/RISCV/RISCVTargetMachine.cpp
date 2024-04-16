@@ -86,6 +86,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVInsertVSETVLIPass(*PR);
   initializeRISCVDAGToDAGISelPass(*PR);
   initializeRISCVInitUndefPass(*PR);
+  initializeRISCVMachineInstrPrinterPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT) {
@@ -370,6 +371,7 @@ void RISCVPassConfig::addPreRegAlloc() {
   if (TM->getOptLevel() != CodeGenOpt::None)
     addPass(createRISCVMergeBaseOffsetOptPass());
   addPass(createRISCVInsertVSETVLIPass());
+  addPass(createRISCVMachineInstrPrinterPass());
 }
 
 void RISCVPassConfig::addOptimizedRegAlloc() {

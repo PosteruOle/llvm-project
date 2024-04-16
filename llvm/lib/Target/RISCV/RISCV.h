@@ -30,6 +30,9 @@ class RISCVRegisterBankInfo;
 class RISCVSubtarget;
 class RISCVTargetMachine;
 
+FunctionPass *createRISCVMachineInstrPrinterPass();
+void initializeRISCVMachineInstrPrinterPass(PassRegistry &); 
+
 FunctionPass *createRISCVCodeGenPreparePass();
 void initializeRISCVCodeGenPreparePass(PassRegistry &);
 

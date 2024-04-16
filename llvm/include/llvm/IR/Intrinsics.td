@@ -1309,6 +1309,7 @@ let IntrProperties = [IntrNoMem, IntrSpeculatable, IntrWillReturn,
   
   def int_crc32 : DefaultAttrsIntrinsic<[llvm_anyint_ty], [LLVMMatchType<0>, LLVMMatchType<0>, LLVMMatchType<0>]>;
 }
+
 let IntrProperties = [IntrNoMem, IntrSpeculatable, IntrWillReturn] in {
   def int_crc8 : DefaultAttrsIntrinsic<[llvm_i16_ty], [llvm_i8_ty, llvm_i16_ty]>;
 }

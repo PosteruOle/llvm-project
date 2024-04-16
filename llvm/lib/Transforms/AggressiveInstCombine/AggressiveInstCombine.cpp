@@ -42,6 +42,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/IR/IntrinsicsRISCV.h"
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -63,6 +64,14 @@ STATISTIC(NumReverseRecognized, "Number of reverse function recognized");
 static cl::opt<unsigned> MaxInstrsToScan(
     "aggressive-instcombine-max-scan-instrs", cl::init(64), cl::Hidden,
     cl::desc("Max number of instructions to scan for aggressive instcombine."));
+
+static cl::opt<bool> UseOptionOne(
+    "use-opt-one", cl::init(false), cl::Hidden,
+    cl::desc("Using option one!"));    
+
+static cl::opt<bool> UseOptionTwo(
+    "use-opt-two", cl::init(false), cl::Hidden,
+    cl::desc("Using option two!"));  
 
 /// Match a pattern for a bitwise funnel/rotate operation that partially guards
 /// against undefined behavior by branching around the funnel-shift/rotation
@@ -645,7 +654,393 @@ define dso_local zeroext i16 @crcu8(i8 zeroext %0, i16 zeroext %1) #0 {
   ret i16 %57
 }
 */
-static bool tryToRecognizeCRC32(Instruction &I){
+static bool tryToRecognizeCRC32_v1(Instruction &I){
+  ReturnInst *RI=dyn_cast<ReturnInst>(&I);
+  ReturnInst *RIfinal=dyn_cast<ReturnInst>(&I);
+  if(!RI || !RIfinal)
+    return false;
+  
+  LoadInst *LI=dyn_cast<LoadInst>(RI->getPrevNode());
+  LoadInst *LIfinal=dyn_cast<LoadInst>(RI->getPrevNode());
+  if(!LI || !LIfinal)
+    return false;
+  
+  errs() << "for.end: checked\n";
+
+  BasicBlock *BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  BranchInst *BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  StoreInst *SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  Instruction *II=dyn_cast<Instruction>(SI->getPrevNode());
+  if(!II)
+    return false;
+
+  Value *help1;
+  Value *help2;
+  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+    return false;
+
+  LI=dyn_cast<LoadInst>(II->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "for.inc: checked\n";
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;  
+
+  errs() << "if.end25: checked\n";
+
+  BB=dyn_cast<BasicBlock>(BI->getParent()->getPrevNode());
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  TruncInst *TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());  
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(32767))))
+    return false;
+
+  ZExtInst *ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "if.else21: checked\n";  
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+ 
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  // We should somehow recognize -32768 here!
+  if(!match(II, m_Or(m_Value(help1), m_Value(help2))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "if.then18: checked\n";
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICmpInst *ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ICMPI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_AShr(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  errs() << "if.else: checked!\n";  
+
+  BB=dyn_cast<BasicBlock>(SI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;                              
+  
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_Xor(m_Value(help1), m_SpecificInt(16386))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false; 
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "if.then: checked!\n";
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(ICMPI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());    
+  if(!SI)
+    return false;
+
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());    
+  if(!TI)
+    return false;          
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_AShr(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;    
+  
+  SI=dyn_cast<StoreInst>(LI->getPrevNode());
+  if(!SI)
+    return false;
+
+  TI=dyn_cast<TruncInst>(SI->getPrevNode());
+  if(!TI)
+    return false;
+
+  II=dyn_cast<Instruction>(TI->getPrevNode());
+  if(!match(II, m_Xor(m_Value(help1), m_Value(help2))))
+    return false;
+
+  II=dyn_cast<Instruction>(II->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;    
+
+  TI=dyn_cast<TruncInst>(ZI->getPrevNode());
+  if(!TI)
+    return false;    
+
+  LI=dyn_cast<LoadInst>(TI->getPrevNode());
+  if(!LI)
+    return false;
+  
+  II=dyn_cast<Instruction>(LI->getPrevNode());
+  if(!match(II, m_And(m_Value(help1), m_SpecificInt(1))))
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(II->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "for.body: checked!\n";
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+
+  ICMPI=dyn_cast<ICmpInst>(BI->getPrevNode());
+  if(!ICMPI)
+    return false;
+
+  ZI=dyn_cast<ZExtInst>(ICMPI->getPrevNode());
+  if(!ZI)
+    return false;
+
+  LI=dyn_cast<LoadInst>(ZI->getPrevNode());
+  if(!LI)
+    return false;
+
+  errs() << "for.cond: checked!\n";
+
+  BB=dyn_cast<BasicBlock>(LI->getParent()->getPrevNode());
+  if(!BB)
+    return false;
+
+  BI=dyn_cast<BranchInst>(&BB->back());
+  if(!BI)
+    return false;
+  
+  // Here we have to match 6 more consecutive store instructions and 5 consecutive alloca instructions!
+  SI=dyn_cast<StoreInst>(BI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;       
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false;
+
+  SI=dyn_cast<StoreInst>(SI->getPrevNode());
+  if(!SI)
+    return false; 
+
+  // Last thing we have to match are 5 alloca instructions!
+  AllocaInst *AI=dyn_cast<AllocaInst>(SI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;                        
+  
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;
+
+  AI=dyn_cast<AllocaInst>(AI->getPrevNode());
+  if(!AI)
+    return false;    
+
+  errs() << "Original unoptimized form of CRC32 algorithm has been recognized!\n";
+  Value *argument1=LIfinal->getFunction()->getArg(0);
+  Value *argument2=LIfinal->getFunction()->getArg(1);
+  Type* ArgType1=argument1->getType();
+  Type* ArgType2=argument2->getType();
+  IRBuilder<> B(LIfinal);
+  
+  //Something to remember because it's very important!
+  //Here is hidden a another aproach for replacing unoptimized crc with optimized version!
+  //auto CRC8 = B.CreateIntrinsic(Intrinsic::crc8, {}, {argument1, argument2});
+  auto CRC8 = B.CreateIntrinsic(Intrinsic::riscv_crc_petar, {}, {argument1, argument2});
+  LIfinal->replaceAllUsesWith(CRC8);
+  Function *F=LIfinal->getFunction();
+  
+  BasicBlock *bb_help10=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help9=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help8=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help7=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help6=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help5=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help4=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help3=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help2=RIfinal->getParent()->getPrevNode()->getPrevNode();
+  BasicBlock *bb_help1=RIfinal->getParent()->getPrevNode();
+  DeleteDeadBlocks({bb_help1, bb_help2, bb_help3, bb_help4, bb_help5, bb_help6, bb_help7, bb_help8, bb_help9, bb_help10});
+  
+  F->back().back().getPrevNode()->eraseFromParent();
+
+  //We will save this part of code! Just to have track of what we have created so far!
+  errs() << "-----------------------------------------\n";
+  errs() << F->getName() << ": \n";
+  for(BasicBlock &BBIT: *F){
+    for(Instruction &IIT: BBIT){
+        errs() << IIT << "\n";
+    }
+  }
+  errs() << "-----------------------------------------\n";
+
+  return true;
+}
+
+static bool tryToRecognizeCRC32_v2(Instruction &I){
   ReturnInst *RI=dyn_cast<ReturnInst>(&I);
   ReturnInst *RIfinal=dyn_cast<ReturnInst>(&I);
   if(!RI || !RIfinal)
@@ -671,7 +1066,8 @@ static bool tryToRecognizeCRC32(Instruction &I){
 
   Value *help1;
   Value *help2;
-  if(!match(II, m_Add(m_Value(help1), m_Value(help2))))
+  II->dump();
+  if(!match(II, m_Add(m_Load(m_Value(help1)), m_SpecificInt(1))))
     return false;
 
   LI=dyn_cast<LoadInst>(II->getPrevNode());
@@ -694,7 +1090,7 @@ static bool tryToRecognizeCRC32(Instruction &I){
 
   // For some reason we could not see trunc instruction!
   II=dyn_cast<Instruction>(SI->getPrevNode());
-  if(!match(II, m_And(m_Value(help1), m_SpecificInt(32767))))
+  if(!match(II, m_And(m_Load(m_Value(help1)), m_SpecificInt(32767))))
     return false;
 
   LI=dyn_cast<LoadInst>(II->getPrevNode());
@@ -714,8 +1110,9 @@ static bool tryToRecognizeCRC32(Instruction &I){
     return false;
 
   II=dyn_cast<Instruction>(SI->getPrevNode());
+  II->dump();
   // We should somehow recognize -32768 here!
-  if(!match(II, m_Or(m_Value(help1), m_Value(help2))))
+  if(!match(II, m_Or(m_Load(m_Value(help1)), m_Value(help2))))
     return false;
 
   LI=dyn_cast<LoadInst>(II->getPrevNode());
@@ -810,8 +1207,6 @@ static bool tryToRecognizeCRC32(Instruction &I){
   if(!ZI)
     return false;
 
-  //Just to check something!
-  //SI=dyn_cast<StoreInst>(ZI->getPrevNode()); <- as we already assumed it doesn't work!
   LI=dyn_cast<LoadInst>(ZI->getPrevNode());
   if(!LI)
     return false;
@@ -945,12 +1340,6 @@ static bool tryToRecognizeCRC32(Instruction &I){
   Type* ArgType2=argument2->getType();
   IRBuilder<> B(LIfinal);
   
-  //Something to remember because it's very important!
-  //Here is hidden a another aproach for replacing unoptimized crc with optimized version!
-  //auto CRC8 = B.CreateIntrinsic(Intrinsic::crc8, {}, {argument1, argument2});
-  //LIfinal->replaceAllUsesWith(CRC8);
-  //LIfinal->removeFromParent();
-
   BasicBlock *bb_help10=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
   BasicBlock *bb_help9=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
   BasicBlock *bb_help8=RIfinal->getParent()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode()->getPrevNode();
@@ -962,10 +1351,6 @@ static bool tryToRecognizeCRC32(Instruction &I){
   BasicBlock *bb_help2=RIfinal->getParent()->getPrevNode()->getPrevNode();
   BasicBlock *bb_help1=RIfinal->getParent()->getPrevNode();
   DeleteDeadBlocks({bb_help1, bb_help2, bb_help3, bb_help4, bb_help5, bb_help6, bb_help7, bb_help8, bb_help9, bb_help10});
-  
-  //Another very important thing!
-  //Instruction *CRC8cast=dyn_cast<Instruction>(CRC8);
-  //IRBuilder<> Builder(CRC8cast);
 
   IRBuilder<> Builder(LIfinal);
   Function *F=LIfinal->getFunction();
@@ -975,7 +1360,7 @@ static bool tryToRecognizeCRC32(Instruction &I){
   AllocaInst *AI3=Builder.CreateAlloca(ArgType1, nullptr, "i");
   AllocaInst *AI4=Builder.CreateAlloca(ArgType1, nullptr, "x16");
   AllocaInst *AI5=Builder.CreateAlloca(ArgType1, nullptr, "carry");
-  AllocaInst *AI6=Builder.CreateAlloca(ArgType1, nullptr, "crc");
+  AllocaInst *AI6=Builder.CreateAlloca(Builder.getInt64Ty(), nullptr, "crc");
   StoreInst *SI1=Builder.CreateStore(argument1, AI1);
   StoreInst *SI2=Builder.CreateStore(argument2, AI2);
   StoreInst *SI3=Builder.CreateStore(Builder.getInt8(0), AI3);
@@ -1057,12 +1442,15 @@ static bool tryToRecognizeCRC32(Instruction &I){
   IRBuilder<> ForEndBuilder(LIfinal);
   LoadInst *LI11=ForEndBuilder.CreateLoad(B.getInt64Ty(), AI6);
   Value* TI20=ForEndBuilder.CreateTrunc(LI11, B.getInt16Ty(), "conv14");
-  //ForEndBuilder.CreateRet(TI20);
 
   LIfinal->replaceAllUsesWith(TI20);
-
+  
+  F->back().back().getPrevNode()->eraseFromParent();
   //We will save this part of code! Just to have track of what we have created so far!
+  
   errs() << "-----------------------------------------\n";
+  errs() << "Function name: " << F->getName() << " \n";
+  errs() << "Function body:\n";
   for(BasicBlock &BBIT: *F){
     errs() << BBIT.getName() << ":\n";
     for(Instruction &IIT: BBIT){
@@ -1845,10 +2233,19 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
     errs() << "We won't check this function!" << "\n";
     return false;
   }
-  bool crc_flag=tryToRecognizeCRC32(F.back().back());
-  if(crc_flag)
-    errs() << "CRC32 algorithm has been recognised!" << "\n"; 
   
+  if(UseOptionOne && !UseOptionTwo){
+    bool crc_flag=tryToRecognizeCRC32_v1(F.back().back());
+    if(crc_flag)
+      errs() << "CRC32 algorithm has been recognised!" << "\n";   
+  } else if(!UseOptionOne && UseOptionTwo){
+    bool crc_flag=tryToRecognizeCRC32_v2(F.back().back());
+    if(crc_flag)
+      errs() << "CRC32 algorithm has been recognised!" << "\n";
+  } else if(UseOptionOne && UseOptionTwo){
+    errs() << "Sorry, but you can't use both options for crc algorithm recognition!\n";
+  }
+
   Module *M=F.getParent();
   for(Function &F: *M){
     for (BasicBlock &BB : F) {
@@ -1868,15 +2265,12 @@ static bool foldUnusualPatterns(Function &F, DominatorTree &DT,
         MadeChange |= foldAnyOrAllBitsSet(I);
         MadeChange |= foldGuardedFunnelShift(I, DT);
         MadeChange |= tryToRecognizePopCount(I);
-        bool flag1=tryToRecognizeTableBasedCRC32(I);
-        //bool flag2=tryToRecognizeCRC32(I);
-        //bool flag2=false;
-        MadeChange |= flag1;
-        if(flag1)
-          errs() << "Function we have created seems to work properly!\n";
+        
+        //bool flag1=tryToRecognizeTableBasedCRC32(I);
+        //MadeChange |= flag1;
+        //if(flag1)
+        //  errs() << "Function we have created seems to work properly!\n";
 
-        //if(flag2)
-        //  errs() << "CRC32 algorithm has been recognised!" << "\n";
         MadeChange |= tryToFPToSat(I, TTI);
         //MadeChange |= tryToRecognizeTableBasedCttz(I);
         bool recognised=tryToRecognizeTableBasedCttz(I);
@@ -1931,6 +2325,6 @@ PreservedAnalyses AggressiveInstCombinePass::run(Function &F,
   // Mark all the analyses that instcombine updates as preserved.
   PreservedAnalyses PA;
   PA.preserveSet<CFGAnalyses>();
-  return PreservedAnalyses::none();
-  //return PA;
+  //return PreservedAnalyses::none();
+  return PA;
 }

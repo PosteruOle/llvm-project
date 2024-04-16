@@ -1201,12 +1201,19 @@ EmitMachineNode(SDNode *Node, bool IsClone, bool IsCloned,
 void InstrEmitter::
 EmitSpecialNode(SDNode *Node, bool IsClone, bool IsCloned,
                 DenseMap<SDValue, Register> &VRBaseMap) {
+  
+  //errs() << "Hi from InstrEmitter::EmitSpecialNode!\n";
+  //errs() << "Node->opcode() = " << Node->getOpcode() << "\n";
   switch (Node->getOpcode()) {
   default:
 #ifndef NDEBUG
     Node->dump();
 #endif
     llvm_unreachable("This target-independent node should have been selected!");
+  case ISD::ZERO_EXTEND:{
+    errs() << "We reached ISD::ZERO_EXTEND case!\n";
+    break;
+  }
   case ISD::EntryToken:
   case ISD::MERGE_VALUES:
   case ISD::TokenFactor: // fall thru

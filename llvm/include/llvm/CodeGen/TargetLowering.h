@@ -5059,7 +5059,7 @@ public:
   /// \param N Node to expand
   /// \returns The expansion result or SDValue() if it fails.
   SDValue expandCTTZ(SDNode *N, SelectionDAG &DAG) const;
-
+  SDValue expandCRC8(SDNode *N, SelectionDAG &DAG) const;
   SDValue expandCRC(SDNode *N, SelectionDAG &DAG) const;
   /// Expand VP_CTTZ/VP_CTTZ_ZERO_UNDEF nodes.
   /// \param N Node to expand

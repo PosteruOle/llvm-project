@@ -272,7 +272,22 @@ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI,
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
   // Get byte count of instruction.
   unsigned Size = Desc.getSize();
-
+  errs() << "Hello from RISCVMCCodeEmitter::encodeInstruction!\n";
+  
+  if(MI.getOpcode()==RISCV::PseudoCRC32){
+    errs() << "We are in RISCVMCCodeEmitter::encodeInstruction!\n";
+    MCOperand DestReg = MI.getOperand(0);
+    MCOperand SrcReg = MI.getOperand(1);
+    MCOperand TPReg = MI.getOperand(2);
+    MCInst TmpInst = MCInstBuilder(RISCV::ADD)
+                       .addOperand(DestReg)
+                       .addOperand(SrcReg)
+                       .addOperand(TPReg);
+    uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+    support::endian::write(CB, Binary, support::little);
+    return;
+  }
+  
   // RISCVInstrInfo::getInstSizeInBytes expects that the total size of the
   // expanded instructions for each pseudo is correct in the Size field of the
   // tablegen definition for the pseudo.

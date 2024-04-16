@@ -76,7 +76,7 @@ static cl::opt<int>
 RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
                                          const RISCVSubtarget &STI)
     : TargetLowering(TM), Subtarget(STI) {
-
+      //TM.getIntrinsicInfo()
   if (Subtarget.isRVE())
     report_fatal_error("Codegen not yet implemented for RVE");
 
@@ -1156,6 +1156,12 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   setLibcallName(RTLIB::FPEXT_F16_F32, "__extendhfsf2");
   setLibcallName(RTLIB::FPROUND_F32_F16, "__truncsfhf2");
 
+  //Petar's insertion!
+  setOperationAction(ISD::INLINEASM, MVT::i16, Custom);
+  setOperationAction(ISD::CRC8, MVT::i16, Custom);
+  //setOperationAction(RISCVISD::PSEUDO_CRC, MVT::i64, Legal);
+  //setOperationAction(ISD::CRC8, MVT::i16, Legal);
+  setOperationAction(ISD::INTRINSIC_WO_CHAIN, MVT::i16, Custom);
   // Disable strict node mutation.
   IsStrictFPEnabled = true;
 }
@@ -4414,6 +4420,25 @@ static SDValue lowerConstant(SDValue Op, SelectionDAG &DAG,
   return SDValue();
 }
 
+static SDValue LowerCRC8(SDValue Op, SelectionDAG &DAG, const RISCVSubtarget &Subtarget){
+  SDValue N1=Op.getOperand(1);
+  SDValue N2=Op.getOperand(2);
+  SDLoc dl(Op);
+  errs() << "Lowering CRC8 intrinsic for RISCV architecture!\n";
+  MVT VT = Op.getSimpleValueType();
+  SDValue N1_ext=DAG.getAnyExtOrTrunc(N1, dl, MVT::i16);
+  //SDValue N2_ext=DAG.getAnyExtOrTrunc(N2, dl, MVT::i);
+  SDValue add_node=DAG.getNode(ISD::ADD, dl, VT, N1_ext, N2);
+  SDValue mul_node=DAG.getNode(ISD::MUL, dl, VT, add_node, N1_ext);
+  //return DAG.getNode(RISCVISD::PSEUDO_CRC, dl, MVT::i64, N1_ext, N2_ext);
+  //return DAG.getNode(RISCVISD::PSEUDO_CRC, dl, MVT::i16, N1, N2);
+  //return DAG.getNode(RISCVISD::SRLW, dl, MVT::i64, N1_ext, N2_ext);
+  //return DAG.getNode(ISD::CRC8, dl, VT, N1, N2);
+  //return DAG.getNode(RISCV::PseudoCRC, dl, VT, N1, N2);
+  //return DAG.getNode(ISD::INLINEASM, dl, VT, N1, N2);
+  return DAG.getNode(ISD::SUB, dl, VT, mul_node, N1_ext);
+}
+
 static SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG &DAG,
                                  const RISCVSubtarget &Subtarget) {
   SDLoc dl(Op);
@@ -4535,9 +4560,14 @@ SDValue RISCVTargetLowering::LowerIS_FPCLASS(SDValue Op,
 
 SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
                                             SelectionDAG &DAG) const {
+  errs() << "We have entered LowerOperation function!\n";
   switch (Op.getOpcode()) {
   default:
     report_fatal_error("unimplemented operand");
+  case ISD::CRC8: {
+    errs() << "We couldn not reach this line!\n";
+    return LowerCRC8(Op, DAG, Subtarget);
+  }
   case ISD::ATOMIC_FENCE:
     return LowerATOMIC_FENCE(Op, DAG, Subtarget);
   case ISD::GlobalAddress:
@@ -5143,7 +5173,7 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
   case ISD::CTLZ:
   case ISD::CTLZ_ZERO_UNDEF:
   case ISD::CTTZ_ZERO_UNDEF:
-    return lowerCTLZ_CTTZ_ZERO_UNDEF(Op, DAG);
+    return lowerCTLZ_CTTZ_ZERO_UNDEF(Op, DAG);  
   case ISD::VSELECT:
     return lowerFixedLengthVectorSelectToRVV(Op, DAG);
   case ISD::FCOPYSIGN:
@@ -6718,13 +6748,24 @@ static SDValue lowerGetVectorLength(SDNode *N, SelectionDAG &DAG,
 
 SDValue RISCVTargetLowering::LowerINTRINSIC_WO_CHAIN(SDValue Op,
                                                      SelectionDAG &DAG) const {
+  errs() << "Hi from LowerINTRINSIC_WO_CHAIN!\n";
   unsigned IntNo = Op.getConstantOperandVal(0);
   SDLoc DL(Op);
   MVT XLenVT = Subtarget.getXLenVT();
-
+  errs() << Op.getOpcode() << "\n";
+  errs() << Op.getOperand(0).getOpcode() << "\n";
   switch (IntNo) {
   default:
     break; // Don't custom lower most intrinsics.
+  case Intrinsic::riscv_crc_petar:{
+    errs() << "Hi from lower intrinsic without chain (Intrinsic::riscv_crc_petar)!\n";
+    SDValue N1=Op.getOperand(1);
+    SDValue N2=Op.getOperand(2);
+    SDValue N1_ext=DAG.getAnyExtOrTrunc(N1, DL, MVT::i64);
+    SDValue N2_ext=DAG.getAnyExtOrTrunc(N2, DL, MVT::i64);
+    SDValue PSEUDO_CRC_NODE=DAG.getNode(RISCVISD::PSEUDO_CRC, DL, MVT::i64, N1_ext, N2_ext);
+    return DAG.getAnyExtOrTrunc(PSEUDO_CRC_NODE, DL, MVT::i16);
+  }
   case Intrinsic::thread_pointer: {
     EVT PtrVT = getPointerTy(DAG.getDataLayout());
     return DAG.getRegister(RISCV::X4, PtrVT);
@@ -9049,6 +9090,8 @@ static RISCVISD::NodeType getRISCVWOpcode(unsigned Opcode) {
   switch (Opcode) {
   default:
     llvm_unreachable("Unexpected opcode");
+  case ISD::CRC8:
+    return RISCVISD::PSEUDO_CRC;
   case ISD::SHL:
     return RISCVISD::SLLW;
   case ISD::SRA:
@@ -9103,6 +9146,11 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
   switch (N->getOpcode()) {
   default:
     llvm_unreachable("Don't know how to custom type legalize this operation!");
+  //case RISCV::PseudoCRC:
+  case ISD::CRC8:
+    errs() << "We are in ReplaceNodeResults function! ISD::CRC8 case!\n";
+    //Results.push_back(DAG.getNode(RISCV::PseudoCRC, DL, MVT::i16, {N->getOperand(0), N->getOperand(1)}));
+    break;
   case ISD::STRICT_FP_TO_SINT:
   case ISD::STRICT_FP_TO_UINT:
   case ISD::FP_TO_SINT:
@@ -15482,6 +15530,7 @@ const char *RISCVTargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch ((RISCVISD::NodeType)Opcode) {
   case RISCVISD::FIRST_NUMBER:
     break;
+  NODE_NAME_CASE(PSEUDO_CRC)  
   NODE_NAME_CASE(RET_GLUE)
   NODE_NAME_CASE(SRET_GLUE)
   NODE_NAME_CASE(MRET_GLUE)

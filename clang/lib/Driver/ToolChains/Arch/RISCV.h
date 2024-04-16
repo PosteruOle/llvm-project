@@ -27,7 +27,7 @@ StringRef getRISCVABI(const llvm::opt::ArgList &Args,
 StringRef getRISCVArch(const llvm::opt::ArgList &Args,
                        const llvm::Triple &Triple);
 std::string getRISCVTargetCPU(const llvm::opt::ArgList &Args,
-                              const llvm::Triple &Triple);
+                              const llvm::Triple &Triple);                             
 } // end namespace riscv
 } // namespace tools
 } // end namespace driver

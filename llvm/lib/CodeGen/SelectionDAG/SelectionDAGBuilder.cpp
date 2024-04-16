@@ -10436,7 +10436,7 @@ void TargetLowering::LowerOperationWrapper(SDNode *N,
                                            SmallVectorImpl<SDValue> &Results,
                                            SelectionDAG &DAG) const {
   SDValue Res = LowerOperation(SDValue(N, 0), DAG);
-
+  errs() << "Little before lowerOperation!\n";
   if (!Res.getNode())
     return;
 

@@ -370,6 +370,7 @@ enum NodeType : unsigned {
   STRICT_FSETCC_VL,
   STRICT_FSETCCS_VL,
   STRICT_VFROUND_NOEXCEPT_VL,
+  PSEUDO_CRC,
 
   // WARNING: Do not add anything in the end unless you want the node to
   // have memop! In fact, starting from FIRST_TARGET_MEMORY_OPCODE all
@@ -384,7 +385,8 @@ enum NodeType : unsigned {
   TH_LWUD,
   TH_LDD,
   TH_SWD,
-  TH_SDD,
+  TH_SDD
+  
 };
 } // namespace RISCVISD
 
